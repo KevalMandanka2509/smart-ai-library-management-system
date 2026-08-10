@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getStudent, deleteStudent } from '../../services/api';
+import { formatIST } from '../../utils/dateUtils';
 import './StudentDetails.css';
 
 const StudentDetails = ({ studentId, onBack, onEdit }) => {
@@ -99,7 +100,7 @@ const StudentDetails = ({ studentId, onBack, onEdit }) => {
             </div>
             <div className="detail-item">
               <label>Date of Birth</label>
-              <span>{student.date_of_birth ? new Date(student.date_of_birth).toLocaleDateString() : 'N/A'}</span>
+              <span>{student.date_of_birth ? formatIST(student.date_of_birth) : 'N/A'}</span>
             </div>
             <div className="detail-item">
               <label>Gender</label>
@@ -131,7 +132,7 @@ const StudentDetails = ({ studentId, onBack, onEdit }) => {
             </div>
             <div className="detail-item">
               <label>Total Fines</label>
-              <span>${student.total_fines?.toFixed(2) || '0.00'}</span>
+              <span>₹{student.total_fines?.toFixed(2) || '0.00'}</span>
             </div>
             <div className="detail-item">
               <label>Address</label>

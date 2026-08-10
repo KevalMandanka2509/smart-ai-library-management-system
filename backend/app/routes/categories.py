@@ -8,7 +8,8 @@ import logging
 from ..database import get_db
 from ..models.category import category_document, serialize_category, serialize_categories
 from ..schemas.category import CategoryCreate, CategoryUpdate, CategoryResponse
-from ..core.security import get_current_user, get_current_admin
+from ..core.security import get_current_user
+from ..core.rbac import has_permission
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/api/v1/categories", tags=["Categories"])
 async def create_category(
     category: CategoryCreate,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("categories:write"))
 ):
     """
     Add a new category to the library.
@@ -156,7 +157,7 @@ async def update_category(
     category_id: str,
     category_update: CategoryUpdate,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("categories:write"))
 ):
     """
     Update category details.
@@ -225,7 +226,7 @@ async def update_category(
 async def delete_category(
     category_id: str,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("categories:delete"))
 ):
     """
     Soft delete a category.
@@ -263,18 +264,21 @@ async def delete_category(
             detail=f"Cannot delete category '{category.get('name')}'. {books_with_category} book(s) are still associated with this category. Please reassign or remove books first."
         )
 
-    # Soft delete
-    collection.update_one(
-        {"_id": ObjectId(category_id)},
-        {"$set": {
-            "is_deleted": True,
-            "status": "inactive",
-            "updated_at": datetime.utcnow()
-        }}
-    )
+    # Insert into recycle bin
+    db.recycle_bin.insert_one({
+        "original_collection": "categories",
+        "record": category,
+        "deleted_at": datetime.utcnow(),
+        "deleted_by": current_user.get("username", "admin"),
+        "display_name": category.get("name", "Unknown Category")
+    })
 
-    logger.info(f"🗑️ Category soft-deleted: {category.get('name')} (ID: {category_id})")
+    # Hard delete from categories collection
+    collection.delete_one({"_id": ObjectId(category_id)})
+
+    logger.info(f"🗑️ Category moved to recycle bin: {category.get('name')} (ID: {category_id})")
     return {
         "message": f"Category '{category.get('name')}' has been deleted successfully",
         "id": category_id
     }
+

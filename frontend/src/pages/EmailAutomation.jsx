@@ -9,6 +9,7 @@ import {
   sendCustomEmail,
   getEmailTemplates
 } from '../services/api';
+import { formatIST } from '../utils/dateUtils';
 import './EmailAutomation.css';
 
 const EmailAutomation = () => {
@@ -185,11 +186,7 @@ const EmailAutomation = () => {
   // ── Format date helper ──
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
-             d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    } catch { return dateStr; }
+    return formatIST(dateStr);
   };
 
   // ── Tab config ──

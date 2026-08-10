@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getFines, payFine } from '../services/api';
+import { formatIST } from '../utils/dateUtils';
 import { PageHeader, DataTable } from '../components/layout/EnterpriseLibrary';
 import '../styles/design-tokens.css';
 import './Dashboard.css';
@@ -12,7 +13,10 @@ const Fines = () => {
   const [activeTab, setActiveTab] = useState('unpaid'); // 'unpaid' or 'paid'
   const [payingId, setPayingId] = useState(null);
 
-  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const [currentUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('user') || '{}'); }
+    catch { return {}; }
+  });
   const isAdmin = currentUser.role === 'admin';
 
   useEffect(() => {
@@ -57,13 +61,7 @@ const Fines = () => {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatIST(dateStr);
   };
 
   return (
@@ -154,24 +152,28 @@ const Fines = () => {
           } else {
             columns.push({
               header: 'Action',
-              cell: (row) => (
-                <button
-                  onClick={() => handlePay(row.id)}
-                  disabled={payingId === row.id}
-                  style={{
-                    background: 'linear-gradient(135deg, #10b981, #059669)',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '8px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    opacity: payingId === row.id ? 0.7 : 1
-                  }}
-                >
-                  {payingId === row.id ? 'Processing...' : 'Pay Fine'}
-                </button>
-              )
+              cell: (row) => {
+                const isDynamic = String(row.id).startsWith('dyn_');
+                return (
+                  <button
+                    onClick={() => handlePay(row.id)}
+                    disabled={payingId === row.id || isDynamic}
+                    style={{
+                      background: isDynamic ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '8px',
+                      fontWeight: '600',
+                      cursor: isDynamic ? 'not-allowed' : 'pointer',
+                      opacity: payingId === row.id ? 0.7 : 1
+                    }}
+                    title={isDynamic ? 'Please return the book first to pay the fine' : ''}
+                  >
+                    {payingId === row.id ? 'Processing...' : (isDynamic ? 'Return Book First' : 'Pay Fine')}
+                  </button>
+                );
+              }
             });
           }
 

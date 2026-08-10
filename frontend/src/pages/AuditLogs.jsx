@@ -1,3 +1,4 @@
+import { formatIST } from '../utils/dateUtils';
 import React, { useState, useEffect, useCallback } from 'react';
 import { getAuditLogsAdvanced, exportAuditLogsCsvUrl } from '../services/api';
 import './Dashboard.css';
@@ -224,7 +225,7 @@ const AuditLogs = () => {
                   {logs.map(log => (
                     <tr key={log.id}>
                       <td style={{ fontSize: '0.82rem', color: '#5c5549', whiteSpace: 'nowrap' }}>
-                        {new Date(log.timestamp).toLocaleString()}
+                        {formatIST(log.timestamp)}
                       </td>
                       <td>
                         <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>{log.username}</div>

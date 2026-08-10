@@ -89,10 +89,14 @@ async def trigger_due_reminders(
     now = datetime.utcnow()
     active_borrows = list(db.borrows.find({"status": "issued"}))
 
+    student_ids = list({b.get("student_id") for b in active_borrows if b.get("student_id")})
+    students_cursor = db.students.find({"student_id": {"$in": student_ids}})
+    students_map = {s["student_id"]: s for s in students_cursor}
+
     dispatched_count = 0
     for borrow in active_borrows:
         student_id = borrow.get("student_id")
-        student = db.students.find_one({"student_id": student_id}) if student_id else None
+        student = students_map.get(student_id) if student_id else None
         student_email = student.get("email") if student else None
 
         if student_email:

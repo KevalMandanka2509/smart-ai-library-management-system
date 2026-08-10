@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { forgotPassword, verifyOTP, resetPassword } from '../services/api';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.webp';
 import './LoginPage.css';
 
 const ForgotPassword = () => {

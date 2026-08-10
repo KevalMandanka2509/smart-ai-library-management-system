@@ -46,13 +46,45 @@ async def get_fines(
     if not is_admin:
         query["student_id"] = current_user.get("username")
 
+    # 1. Fetch DB Fines
     total = db.fines.count_documents(query)
     total_pages = max(1, -(-total // page_size))
     skip = (page - 1) * page_size
         
     fines = db.fines.find(query, FINE_LIST_PROJ).sort("created_at", -1).skip(skip).limit(page_size)
+    serialized_fines = [serialize_fine(f) for f in fines]
+
+    # 2. Add Dynamic Accumulating Fines (only on page 1 for unpaid)
+    if not paid and page == 1:
+        now = datetime.utcnow()
+        borrow_query = {"status": "issued", "due_date": {"$lt": now}}
+        if not is_admin:
+            borrow_query["student_id"] = current_user.get("username")
+            
+        overdue_borrows = db.borrows.find(borrow_query)
+        for b in overdue_borrows:
+            due = b.get("due_date")
+            if not due: continue
+            overdue_days = (now - due).days
+            if overdue_days == 0 and (now - due).total_seconds() > 0:
+                overdue_days = 1
+            if overdue_days > 0:
+                serialized_fines.insert(0, {
+                    "id": "dyn_" + str(b["_id"]),
+                    "borrow_id": str(b["_id"]),
+                    "student_id": b.get("student_id", ""),
+                    "student_name": b.get("student_name", "Unknown Student"),
+                    "book_title": b.get("book_title", "Unknown Book"),
+                    "amount": overdue_days * 10.0,
+                    "reason": f"Accumulating ({overdue_days} days late)",
+                    "created_at": now,
+                    "paid": False,
+                    "paid_at": None
+                })
+                total += 1
+
     return {
-        "fines": [serialize_fine(f) for f in fines],
+        "fines": serialized_fines,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -86,3 +118,4 @@ async def pay_fine(request: FinePayRequest, db=Depends(get_db), current_user=Dep
         }
     )
     return {"message": "Fine paid successfully!"}
+

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import libraryShelf from '../assets/library-shelf.png';
+import libraryShelf from '../assets/library-shelf.webp';
 import './LandingPage.css';
 
 const featureItems = [
@@ -109,7 +109,7 @@ const LandingPage = () => {
           </div>
 
           <div className="hero-visual fade-up">
-            <img src={libraryShelf} alt="Library bookshelf with reading chair" className="hero-visual-img" />
+            <img src={libraryShelf} alt="Library bookshelf with reading chair" className="hero-visual-img" loading="lazy" />
           </div>
         </div>
       </section>
@@ -134,7 +134,33 @@ const LandingPage = () => {
         </div>
       </section>
 
-      <section className="stats-section" id="about">
+      
+      <section className="about-section" id="about" style={{ padding: '5rem 2rem', background: '#ffffff' }}>
+        <div className="landing-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            <h2 style={{ fontSize: '2.5rem', color: 'var(--ink)', marginBottom: '1rem' }}>Our Mission & Vision</h2>
+            <p style={{ color: '#64748b', fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto' }}>
+              We aim to modernize libraries with AI-driven insights, ensuring a seamless borrowing experience for students and seamless administration for librarians.
+            </p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
+            <div style={{ padding: '2.5rem', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px', boxShadow: 'var(--shadow)' }}>
+              <h3 style={{ color: 'var(--gold-dark)', fontSize: '1.4rem', marginBottom: '1rem' }}>Innovation First</h3>
+              <p style={{ color: '#475569', lineHeight: '1.7' }}>
+                Leveraging the latest in web technologies, our system provides unparalleled speed and reliability, keeping libraries ahead of the curve.
+              </p>
+            </div>
+            <div style={{ padding: '2.5rem', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px', boxShadow: 'var(--shadow)' }}>
+              <h3 style={{ color: 'var(--gold-dark)', fontSize: '1.4rem', marginBottom: '1rem' }}>User Centric</h3>
+              <p style={{ color: '#475569', lineHeight: '1.7' }}>
+                Every feature is designed with the user in mind. From quick barcode scanning to real-time analytics, we prioritize ease of use.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="stats-section">
         <div className="section-container">
           <div className="stats-bar fade-up">
             {stats.map((stat) => (
@@ -150,7 +176,100 @@ const LandingPage = () => {
         </div>
       </section>
 
-      <section className="cta-section" id="contact">
+      
+      <section className="contact-section" id="contact" style={{ padding: '5rem 2rem', background: '#f8fafc' }}>
+        <div className="landing-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
+            <h2 style={{ fontSize: '2.5rem', color: 'var(--ink)', marginBottom: '1rem' }}>Get in Touch</h2>
+            <p style={{ color: '#64748b', fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto' }}>
+              Connect with us directly for product demonstrations, technical support, or general inquiries.
+            </p>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '3rem', alignItems: 'start' }}>
+            {/* Left Panel: 2x2 Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', transition: 'transform 0.2s', cursor: 'pointer' }} onMouseEnter={(e)=>e.currentTarget.style.transform='translateY(-4px)'} onMouseLeave={(e)=>e.currentTarget.style.transform='translateY(0)'}>
+                <h4 style={{ textTransform: 'uppercase', fontSize: '0.8rem', letterSpacing: '0.05em', color: '#94a3b8', marginBottom: '0.5rem' }}>Email</h4>
+                <div style={{ fontWeight: '600', color: 'var(--ink)' }}>support@smartlibrary.in</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', transition: 'transform 0.2s', cursor: 'pointer' }} onMouseEnter={(e)=>e.currentTarget.style.transform='translateY(-4px)'} onMouseLeave={(e)=>e.currentTarget.style.transform='translateY(0)'}>
+                <h4 style={{ textTransform: 'uppercase', fontSize: '0.8rem', letterSpacing: '0.05em', color: '#94a3b8', marginBottom: '0.5rem' }}>Phone</h4>
+                <div style={{ fontWeight: '600', color: 'var(--ink)' }}>+91 261 247 1234</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', transition: 'transform 0.2s', cursor: 'pointer', gridColumn: '1 / -1' }} onMouseEnter={(e)=>e.currentTarget.style.transform='translateY(-4px)'} onMouseLeave={(e)=>e.currentTarget.style.transform='translateY(0)'}>
+                <h4 style={{ textTransform: 'uppercase', fontSize: '0.8rem', letterSpacing: '0.05em', color: '#94a3b8', marginBottom: '0.5rem' }}>Headquarters</h4>
+                <div style={{ fontWeight: '600', color: 'var(--ink)', lineHeight: '1.5' }}>
+                  4th Floor, Vesu Point, VIP Road,<br/>
+                  Surat, Gujarat 395007
+                </div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', transition: 'transform 0.2s', cursor: 'pointer', gridColumn: '1 / -1' }} onMouseEnter={(e)=>e.currentTarget.style.transform='translateY(-4px)'} onMouseLeave={(e)=>e.currentTarget.style.transform='translateY(0)'}>
+                <h4 style={{ textTransform: 'uppercase', fontSize: '0.8rem', letterSpacing: '0.05em', color: '#94a3b8', marginBottom: '0.5rem' }}>Working Hours</h4>
+                <div style={{ fontWeight: '600', color: 'var(--ink)', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Mon - Sat:</span>
+                  <span>9:00 AM - 6:00 PM IST</span>
+                </div>
+                <div style={{ fontWeight: '600', color: '#ef4444', display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem' }}>
+                  <span>Sunday:</span>
+                  <span>Closed</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Panel: Form Container */}
+            <div style={{ background: '#fdfcf9', padding: '2.5rem', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/api/v1/contact/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(Object.fromEntries(formData))
+                    });
+                    if (response.ok) {
+                        alert('Message sent successfully!');
+                        e.target.reset();
+                    } else {
+                        alert('Failed to send message.');
+                    }
+                } catch(err) {
+                    alert('Error sending message.');
+                }
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#475569', fontSize: '0.9rem', fontWeight: '500' }}>First Name</label>
+                    <input name="name" type="text" placeholder="Rahul" required style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', outline: 'none' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#475569', fontSize: '0.9rem', fontWeight: '500' }}>Last Name</label>
+                    <input type="text" placeholder="Desai" style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', outline: 'none' }} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: '#475569', fontSize: '0.9rem', fontWeight: '500' }}>Email Address</label>
+                  <input name="email" type="email" placeholder="rahul.desai@vnsgu.ac.in" required style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', outline: 'none' }} />
+                </div>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: '#475569', fontSize: '0.9rem', fontWeight: '500' }}>Subject</label>
+                  <input name="subject" type="text" placeholder="Inquiry about Smart Library" required style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', outline: 'none' }} />
+                </div>
+                <div style={{ marginBottom: '2rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: '#475569', fontSize: '0.9rem', fontWeight: '500' }}>Message</label>
+                  <textarea name="message" rows="4" placeholder="How can we help you?" required style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', outline: 'none', resize: 'vertical' }}></textarea>
+                </div>
+                <button type="submit" style={{ width: '100%', background: 'var(--gold)', color: '#ffffff', padding: '0.75rem', borderRadius: '8px', border: 'none', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s', minWidth: '150px' }}>
+                  Send Message
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="cta-section">
         <div className="section-container">
           <div className="cta-container fade-up">
             <div className="cta-content">

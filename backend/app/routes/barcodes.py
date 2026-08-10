@@ -209,79 +209,12 @@ async def scan_issue_book(
     """
     Issue a book directly using scanned Barcode/QR code and student ID.
     """
-    books_col = db.books
-    students_col = db.students
-    borrows_col = db.borrows
+    from .borrows import issue_book
+    from ..schemas.borrow import BorrowIssueRequest
+    
+    req = BorrowIssueRequest(student_id=payload.student_id, book_id=payload.scanned_code)
+    return await issue_book(req, db=db, current_user=current_admin)
 
-    book = books_col.find_one({
-        "$or": [
-            {"barcode_value": payload.scanned_code},
-            {"qr_value": payload.scanned_code},
-            {"isbn": payload.scanned_code}
-        ]
-    })
-    if not book:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Book not found for code: {payload.scanned_code}"
-        )
-
-    if book.get("available_copies", 0) <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No copies available for book '{book.get('title')}'"
-        )
-
-    student = students_col.find_one({
-        "$or": [
-            {"student_id": payload.student_id},
-            {"email": payload.student_id}
-        ]
-    })
-    if not student and ObjectId.is_valid(payload.student_id):
-        student = students_col.find_one({"_id": ObjectId(payload.student_id)})
-            
-    if not student:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Student not found with ID/Email: {payload.student_id}"
-        )
-
-    from datetime import datetime, timedelta
-    issue_date = datetime.utcnow()
-    due_date = issue_date + timedelta(days=payload.due_days)
-
-    borrow_doc = {
-        "book_id": str(book["_id"]),
-        "book_title": book.get("title"),
-        "student_id": student.get("student_id"),
-        "student_name": student.get("full_name"),
-        "issue_date": issue_date,
-        "due_date": due_date,
-        "status": "issued",
-        "fine_amount": 0.0,
-        "created_at": issue_date,
-        "updated_at": issue_date
-    }
-
-    result = borrows_col.insert_one(borrow_doc)
-
-    new_avail = book.get("available_copies", 1) - 1
-    books_col.update_one(
-        {"_id": book["_id"]},
-        {"$set": {
-            "available_copies": new_avail,
-            "is_available": new_avail > 0,
-            "updated_at": datetime.utcnow()
-        }}
-    )
-
-    return {
-        "success": True,
-        "message": f"Successfully issued '{book.get('title')}' to {student.get('full_name')}",
-        "borrow_id": str(result.inserted_id),
-        "due_date": due_date.strftime("%Y-%m-%d")
-    }
 
 # ============================================
 # 7. RETURN BOOK USING SCAN
@@ -295,56 +228,28 @@ async def scan_return_book(
     """
     Return an issued book directly using scanned Barcode/QR code.
     """
-    books_col = db.books
-    borrows_col = db.borrows
-
-    book = books_col.find_one({
+    from .borrows import return_book
+    from ..schemas.borrow import BorrowReturnRequest
+    
+    # We must resolve the student_id for the BorrowReturnRequest
+    book = db.books.find_one({
         "$or": [
             {"barcode_value": payload.scanned_code},
             {"qr_value": payload.scanned_code},
             {"isbn": payload.scanned_code}
         ]
     })
+    
     if not book:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Book not found for code: {payload.scanned_code}"
-        )
-
-    active_borrow = borrows_col.find_one({
+        raise HTTPException(status_code=404, detail=f"Book not found for code: {payload.scanned_code}")
+        
+    active_borrow = db.borrows.find_one({
         "book_id": str(book["_id"]),
         "status": "issued"
     })
-
+    
     if not active_borrow:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No active issue/borrow record found for book '{book.get('title')}'"
-        )
-
-    return_date = datetime.utcnow()
-    borrows_col.update_one(
-        {"_id": active_borrow["_id"]},
-        {"$set": {
-            "status": "returned",
-            "return_date": return_date,
-            "updated_at": return_date
-        }}
-    )
-
-    new_avail = book.get("available_copies", 0) + 1
-    books_col.update_one(
-        {"_id": book["_id"]},
-        {"$set": {
-            "available_copies": new_avail,
-            "is_available": True,
-            "updated_at": return_date
-        }}
-    )
-
-    return {
-        "success": True,
-        "message": f"Book '{book.get('title')}' successfully returned.",
-        "student_name": active_borrow.get("student_name"),
-        "return_date": return_date.strftime("%Y-%m-%d %H:%M:%S")
-    }
+        raise HTTPException(status_code=400, detail=f"No active borrow record found for book '{book.get('title')}'")
+        
+    req = BorrowReturnRequest(student_id=active_borrow["student_id"], book_id=str(book["_id"]))
+    return await return_book(req, db=db, current_user=current_admin)

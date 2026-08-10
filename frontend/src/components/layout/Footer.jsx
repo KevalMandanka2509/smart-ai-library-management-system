@@ -1,13 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import './Footer.css';
-import logo from "../../assets/logo1.png";
+import logo from "../../assets/logo1.webp";
 const Footer = () => {
   return (
     <footer className="footer">
       <div className="footer-container">
         <Link to="/" className="footer-brand">
-          <img src={logo} alt="Smart Library Logo" className="footer-logo" />
+          <img src={logo} alt="Smart Library Logo" className="footer-logo" loading="lazy" />
           <span>Smart Library</span>
         </Link>
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getBook, deleteBook, getBarcodeImageUrl, getQrImageUrl } from '../services/api';
 import './books.css';
+import { formatIST } from '../utils/dateUtils';
 
 // SVG Icons
 const IconBack = () => (
@@ -93,11 +94,7 @@ const BookDetailPage = () => {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+    return formatIST(dateStr);
   };
 
   // Loading state

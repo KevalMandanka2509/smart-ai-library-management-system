@@ -8,6 +8,8 @@ import {
   updateNotificationSettings,
   createSystemNotification
 } from '../services/api';
+import { formatIST } from '../utils/dateUtils';
+import { AnalyticsCard, PageHeader } from '../components/layout/EnterpriseLibrary';
 import './Notifications.css';
 
 const IconTrash = () => (
@@ -21,6 +23,8 @@ const Notifications = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all'); // all, unread, borrows, fines, reservations, system
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Feedback Banner States
   const [error, setError] = useState('');
@@ -40,7 +44,10 @@ const Notifications = () => {
   const [broadcast, setBroadcast] = useState({ title: '', message: '', target_student_id: '' });
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
 
-  const isAdmin = JSON.parse(localStorage.getItem('user'))?.role === 'admin';
+  const [isAdmin] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('user'))?.role === 'admin'; }
+    catch { return false; }
+  });
 
   // Notification list fetcher
   const loadNotificationsList = useCallback(async () => {
@@ -167,11 +174,7 @@ const Notifications = () => {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
-             d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    } catch { return dateStr; }
+    return formatIST(dateStr);
   };
 
   // Render Visual Accents based on types
@@ -185,32 +188,33 @@ const Notifications = () => {
   };
 
   const filteredNotifs = getFilteredNotifications();
+  const totalPages = Math.ceil(filteredNotifs.length / itemsPerPage) || 1;
+  const paginatedNotifs = filteredNotifs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <div className="notifications-page">
       {/* Page Header */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.75rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.25rem 0' }}>🔔 Notifications Center</h2>
-          <span style={{ fontSize: '0.9rem', color: '#64748b' }}>Manage alerts, alerts routing channels, and system notifications logs.</span>
-        </div>
-      </header>
+      <PageHeader 
+        title="🔔 Notifications Center" 
+        subtitle="Manage alerts, alerts routing channels, and system notifications logs." 
+      />
 
       {/* Alert Feedbacks */}
       {success && <div className="sms-alert success" style={{ marginBottom: '1.25rem' }}>✅ {success}</div>}
       {error && <div className="sms-alert error" style={{ marginBottom: '1.25rem' }}>❌ {error}</div>}
 
       {/* Tabs Layout */}
-      <div className="sms-tab-nav" style={{ marginBottom: '1.5rem' }}>
-        <button className={`sms-tab-btn ${activeTab === 'inbox' ? 'active' : ''}`} onClick={() => setActiveTab('inbox')}>
+      <div className="notif-tab-nav" style={{ marginBottom: '1.5rem' }}>
+        <button className={`notif-tab-btn ${activeTab === 'inbox' ? 'active' : ''}`} onClick={() => setActiveTab('inbox')}>
           📥 Inbox ({unreadCount} New)
         </button>
-        <button className={`sms-tab-btn ${activeTab === 'preferences' ? 'active' : ''}`} onClick={() => setActiveTab('preferences')}>
+        <button className={`notif-tab-btn ${activeTab === 'preferences' ? 'active' : ''}`} onClick={() => setActiveTab('preferences')}>
           ⚙️ Delivery Preferences
         </button>
         {isAdmin && (
-          <button className={`sms-tab-btn ${activeTab === 'broadcast' ? 'active' : ''}`} onClick={() => setActiveTab('broadcast')}>
+          <button className={`notif-tab-btn ${activeTab === 'broadcast' ? 'active' : ''}`} onClick={() => setActiveTab('broadcast')}>
             📢 Dispatch Announcement
           </button>
         )}
@@ -223,26 +227,11 @@ const Notifications = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           {/* Summary Cards Row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
-            <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', padding: '1.25rem 1.5rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>Total Alerts</span>
-              <h3 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900', color: '#1e1b15' }}>{notifications.length}</h3>
-            </div>
-            <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', padding: '1.25rem 1.5rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.25rem', borderLeft: '4px solid #d4a017' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#b8860b', textTransform: 'uppercase' }}>Unread Alerts</span>
-              <h3 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900', color: '#b8860b' }}>{unreadCount}</h3>
-            </div>
-            <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', padding: '1.25rem 1.5rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#16a34a', textTransform: 'uppercase' }}>Borrow / Return</span>
-              <h3 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900', color: '#16a34a' }}>{getFilteredCount('borrows')}</h3>
-            </div>
-            <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', padding: '1.25rem 1.5rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#dc2626', textTransform: 'uppercase' }}>Fines Alert</span>
-              <h3 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900', color: '#dc2626' }}>{getFilteredCount('fines')}</h3>
-            </div>
-            <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', padding: '1.25rem 1.5rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#2563eb', textTransform: 'uppercase' }}>Reservations</span>
-              <h3 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900', color: '#2563eb' }}>{getFilteredCount('reservations')}</h3>
-            </div>
+            <AnalyticsCard title="Total Alerts" value={notifications.length} trend="Total Logged" />
+            <AnalyticsCard title="Unread Alerts" value={unreadCount} />
+            <AnalyticsCard title="Borrow / Return" value={getFilteredCount('borrows')} />
+            <AnalyticsCard title="Fines Alert" value={getFilteredCount('fines')} />
+            <AnalyticsCard title="Reservations" value={getFilteredCount('reservations')} />
           </div>
 
           <div className="notif-grid-layout" style={{ gap: '2rem' }}>
@@ -250,27 +239,27 @@ const Notifications = () => {
             <div className="notif-sidebar-card" style={{ padding: '1.5rem' }}>
               <h4 style={{ margin: '0 0 1.25rem 0', fontSize: '0.9rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '800' }}>Categories</h4>
               <nav className="notif-filter-menu" style={{ gap: '0.5rem' }}>
-                <button className={`notif-filter-btn ${activeFilter === 'all' ? 'active' : ''}`} onClick={() => setActiveFilter('all')}>
+                <button className={`notif-filter-btn ${activeFilter === 'all' ? 'active' : ''}`} onClick={() => { setActiveFilter('all'); setCurrentPage(1); }}>
                   <span>All Alerts</span>
                   <span className="notif-count-badge">{getFilteredCount('all')}</span>
                 </button>
-                <button className={`notif-filter-btn ${activeFilter === 'unread' ? 'active' : ''}`} onClick={() => setActiveFilter('unread')}>
+                <button className={`notif-filter-btn ${activeFilter === 'unread' ? 'active' : ''}`} onClick={() => { setActiveFilter('unread'); setCurrentPage(1); }}>
                   <span>New / Unread</span>
                   <span className="notif-count-badge">{getFilteredCount('unread')}</span>
                 </button>
-                <button className={`notif-filter-btn ${activeFilter === 'borrows' ? 'active' : ''}`} onClick={() => setActiveFilter('borrows')}>
+                <button className={`notif-filter-btn ${activeFilter === 'borrows' ? 'active' : ''}`} onClick={() => { setActiveFilter('borrows'); setCurrentPage(1); }}>
                   <span>Borrow & Returns</span>
                   <span className="notif-count-badge">{getFilteredCount('borrows')}</span>
                 </button>
-                <button className={`notif-filter-btn ${activeFilter === 'fines' ? 'active' : ''}`} onClick={() => setActiveFilter('fines')}>
+                <button className={`notif-filter-btn ${activeFilter === 'fines' ? 'active' : ''}`} onClick={() => { setActiveFilter('fines'); setCurrentPage(1); }}>
                   <span>Fines Assessed</span>
                   <span className="notif-count-badge">{getFilteredCount('fines')}</span>
                 </button>
-                <button className={`notif-filter-btn ${activeFilter === 'reservations' ? 'active' : ''}`} onClick={() => setActiveFilter('reservations')}>
+                <button className={`notif-filter-btn ${activeFilter === 'reservations' ? 'active' : ''}`} onClick={() => { setActiveFilter('reservations'); setCurrentPage(1); }}>
                   <span>Reservations</span>
                   <span className="notif-count-badge">{getFilteredCount('reservations')}</span>
                 </button>
-                <button className={`notif-filter-btn ${activeFilter === 'system' ? 'active' : ''}`} onClick={() => setActiveFilter('system')}>
+                <button className={`notif-filter-btn ${activeFilter === 'system' ? 'active' : ''}`} onClick={() => { setActiveFilter('system'); setCurrentPage(1); }}>
                   <span>System Notices</span>
                   <span className="notif-count-badge">{getFilteredCount('system')}</span>
                 </button>
@@ -302,7 +291,7 @@ const Notifications = () => {
                   <p style={{ margin: 0, color: '#5c5549', fontSize: '0.9rem' }}>Your system transmissions log is clean!</p>
                 </div>
               ) : (
-                filteredNotifs.map((notif) => {
+                paginatedNotifs.map((notif) => {
                   const visual = getNotifVisuals(notif.type);
                   return (
                     <div key={notif.id} className={`notif-alert-card ${!notif.read ? 'unread' : ''}`} style={{ padding: '1.5rem', borderRadius: '16px' }}>
@@ -335,6 +324,25 @@ const Notifications = () => {
                   );
                 })
               )}
+              {totalPages > 1 && (
+                <div className="notif-pagination">
+                  <button 
+                    disabled={currentPage === 1} 
+                    onClick={() => setCurrentPage(p => p - 1)}
+                    className="notif-pagination-btn"
+                  >
+                    Previous
+                  </button>
+                  <span className="notif-pagination-info">Page {currentPage} of {totalPages}</span>
+                  <button 
+                    disabled={currentPage === totalPages} 
+                    onClick={() => setCurrentPage(p => p + 1)}
+                    className="notif-pagination-btn"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -344,9 +352,9 @@ const Notifications = () => {
           TAB 2: NOTIFICATIONS PREFERENCE CHANNELS
           ───────────────────────────────────────────────────────────── */}
       {activeTab === 'preferences' && (
-        <div className="sms-section-card">
-          <h3 className="email-section-title">⚙️ Alert Delivery Preferences</h3>
-          <p className="email-section-subtitle">Manage delivery routes (Browser Popups, Outgoing Email reminders, or SMS text warning alerts).</p>
+        <div className="notif-section-card">
+          <h3 className="notif-section-title">⚙️ Alert Delivery Preferences</h3>
+          <p className="notif-section-subtitle">Manage delivery routes (Browser Popups, Outgoing Email reminders, or SMS text warning alerts).</p>
           
           <form onSubmit={handleSaveSettings}>
             <div className="notif-pref-list">
@@ -397,7 +405,7 @@ const Notifications = () => {
             </div>
 
             <div style={{ marginTop: '1.75rem' }}>
-              <button type="submit" className="btn-sms-primary" disabled={savingSettings}>
+              <button type="submit" className="btn-notif-primary" disabled={savingSettings}>
                 {savingSettings ? '⏳ Saving preferences…' : '💾 Save Settings Preferences'}
               </button>
             </div>
@@ -409,27 +417,27 @@ const Notifications = () => {
           TAB 3: DISPATCH BOARD (Admin Only)
           ───────────────────────────────────────────────────────────── */}
       {activeTab === 'broadcast' && isAdmin && (
-        <div className="sms-section-card">
-          <h3 className="email-section-title">📢 Broadcast System Announcement</h3>
-          <p className="email-section-subtitle">Dispatch system notices to individual borrowers or publish notifications to all active members.</p>
+        <div className="notif-section-card">
+          <h3 className="notif-section-title">📢 Broadcast System Announcement</h3>
+          <p className="notif-section-subtitle">Dispatch system notices to individual borrowers or publish notifications to all active members.</p>
           
           <form onSubmit={handleSendBroadcast}>
-            <div className="sms-form-group">
-              <label className="sms-form-label">Recipient Target ID (Optional)</label>
+            <div className="notif-form-group">
+              <label className="notif-form-label">Recipient Target ID (Optional)</label>
               <input
                 type="text"
-                className="sms-form-input"
+                className="notif-form-input"
                 placeholder="Leave blank to broadcast to ALL student accounts"
                 value={broadcast.target_student_id}
                 onChange={e => setBroadcast(prev => ({ ...prev, target_student_id: e.target.value }))}
               />
             </div>
 
-            <div className="sms-form-group">
-              <label className="sms-form-label">Notice Title</label>
+            <div className="notif-form-group">
+              <label className="notif-form-label">Notice Title</label>
               <input
                 type="text"
-                className="sms-form-input"
+                className="notif-form-input"
                 placeholder="e.g. Scheduled System Upgrades"
                 value={broadcast.title}
                 onChange={e => setBroadcast(prev => ({ ...prev, title: e.target.value }))}
@@ -437,10 +445,10 @@ const Notifications = () => {
               />
             </div>
 
-            <div className="sms-form-group">
-              <label className="sms-form-label">Message Details</label>
+            <div className="notif-form-group">
+              <label className="notif-form-label">Message Details</label>
               <textarea
-                className="sms-form-textarea"
+                className="notif-form-textarea"
                 placeholder="Details of the announcement notice…"
                 value={broadcast.message}
                 onChange={e => setBroadcast(prev => ({ ...prev, message: e.target.value }))}
@@ -449,7 +457,7 @@ const Notifications = () => {
             </div>
 
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-              <button type="submit" className="btn-sms-primary" disabled={sendingBroadcast}>
+              <button type="submit" className="btn-notif-primary" disabled={sendingBroadcast}>
                 {sendingBroadcast ? '⏳ Dispatching announcement…' : '📢 Publish Notice'}
               </button>
             </div>

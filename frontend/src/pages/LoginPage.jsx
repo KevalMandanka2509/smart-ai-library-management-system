@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { login } from '../services/api';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.webp';
 import './LoginPage.css';
 
 const LoginPage = ({ onLoginSuccess }) => {
@@ -42,9 +42,15 @@ const LoginPage = ({ onLoginSuccess }) => {
 
       navigate('/dashboard');
     } catch (err) {
-      setError(
-        err?.response?.data?.detail || 'Invalid email or password. Please try again.'
-      );
+      if (err.code === 'ECONNABORTED' || !err.response) {
+        setError('Network error or server is unresponsive. Please try again.');
+      } else if (err.response?.status === 401) {
+        setError('Invalid email or password.');
+      } else if (err.response?.status >= 500) {
+        setError('Server error. Please try again later.');
+      } else {
+        setError(err.response?.data?.detail || 'An unexpected error occurred.');
+      }
     } finally {
       setIsLoading(false);
     }

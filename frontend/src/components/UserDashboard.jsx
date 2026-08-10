@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getStudentBorrows, getFines, getNotifications, getActiveReservations, browseBooks } from '../services/api';
+import { formatIST } from '../utils/dateUtils';
+import { getStudentBorrows, getFines, getNotifications, getActiveReservations, browseBooks, getRecommendations } from '../services/api';
 import { 
   BookOpen, 
   Clock, 
@@ -146,7 +147,7 @@ const UserDashboard = ({ userName }) => {
         getActiveReservations(),
         getFines(false),
         getNotifications(),
-        browseBooks({ page: 1, page_size: 8, sort_by: 'created_at', sort_order: 'desc' })
+        getRecommendations(studentId)
       ]);
 
       setBorrowedBooks(borrowRes.status === 'fulfilled' ? (borrowRes.value || []) : []);
@@ -186,7 +187,7 @@ const UserDashboard = ({ userName }) => {
 
   const formatDate = (d) => {
     if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+    return formatIST(d);
   };
 
   const getGreeting = () => {
@@ -266,8 +267,8 @@ const UserDashboard = ({ userName }) => {
               Please return: {overdueBooks.map(b => `"${b.book_title}"`).join(', ')} — fines accumulate daily.
             </div>
           </div>
-          <Link to="/fines" style={{ marginLeft: 'auto', padding: '0.6rem 1.2rem', background: '#dc2626', color: '#fff', textDecoration: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.82rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-            View Fines <ArrowRight size={14} />
+          <Link to="/my-books" style={{ marginLeft: 'auto', padding: '0.6rem 1.2rem', background: '#dc2626', color: '#fff', textDecoration: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.82rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+            View My Books ➔
           </Link>
         </div>
       )}

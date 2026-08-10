@@ -27,6 +27,12 @@ def serialize_student(student: dict) -> dict:
     if student and "_id" in student:
         student["id"] = str(student["_id"])
         del student["_id"]
+    
+    if student:
+        student.setdefault("books_borrowed", 0)
+        student.setdefault("total_fines", 0.0)
+        student.setdefault("is_active", True)
+        
     return student
 
 def serialize_students(students: list) -> list:

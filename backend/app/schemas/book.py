@@ -15,7 +15,7 @@ class BookBase(BaseModel):
     available_copies: int = Field(1, ge=0)
     location: Optional[str] = Field(None, max_length=100)
     price: float = Field(0.0, ge=0)
-    cover_image: Optional[str] = Field(None, max_length=500)
+    cover_image: Optional[str] = None
     barcode_value: Optional[str] = Field(None, max_length=100)
     qr_value: Optional[str] = Field(None, max_length=200)
 
@@ -48,7 +48,7 @@ class BookUpdate(BaseModel):
     available_copies: Optional[int] = Field(None, ge=0)
     location: Optional[str] = Field(None, max_length=100)
     price: Optional[float] = Field(None, ge=0)
-    cover_image: Optional[str] = Field(None, max_length=500)
+    cover_image: Optional[str] = None
     barcode_value: Optional[str] = Field(None, max_length=100)
     qr_value: Optional[str] = Field(None, max_length=200)
     is_available: Optional[bool] = None

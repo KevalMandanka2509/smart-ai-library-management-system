@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getTransactions, bulkReturnBooks } from '../services/api';
+import { formatIST } from '../utils/dateUtils';
 import { PageHeader, DataTable, StatusBadge } from '../components/layout/EnterpriseLibrary';
 import '../styles/design-tokens.css';
 import './Dashboard.css'; // Reuse table styling
@@ -97,13 +98,7 @@ const Transactions = () => {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatIST(dateStr);
   };
 
   const totalPages = Math.ceil(totalItems / pageSize) || 1;

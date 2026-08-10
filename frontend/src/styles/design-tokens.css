@@ -53,3 +53,14 @@
   --eu-font-size-lg: 1.15rem;
   --eu-font-size-xl: 1.5rem;
 }
+
+[data-theme="dark"] {
+  --eu-color-bg-base: #121212;
+  --eu-color-bg-surface: #1e1e1e;
+  --eu-color-text-main: #f5f5f5;
+  --eu-color-text-soft: #a3a3a3;
+  --eu-color-border-main: rgba(255, 255, 255, 0.1);
+  --eu-shadow-low: 0 2px 6px rgba(0, 0, 0, 0.3);
+  --eu-shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --eu-shadow-high: 0 20px 45px rgba(0, 0, 0, 0.5);
+}

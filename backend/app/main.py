@@ -15,12 +15,15 @@ from .routes import (
     analytics_router,
     search_router,
     profile_admin_router,
+    recommendations_router,
     settings_router,
     audit_router,
     backup_router,
     email_router,
     barcodes_router,
-    sms_router
+    sms_router,
+    recycle_bin_router,
+    contact_router
 )
 from .core.security_middleware import SecurityHeadersMiddleware, RateLimiterMiddleware
 import logging
@@ -135,12 +138,15 @@ app.include_router(notifications_router)
 app.include_router(analytics_router)
 app.include_router(search_router)
 app.include_router(profile_admin_router)
+app.include_router(recommendations_router)
 app.include_router(settings_router)
 app.include_router(audit_router)
 app.include_router(backup_router)
 app.include_router(email_router)
 app.include_router(barcodes_router)
 app.include_router(sms_router)
+app.include_router(recycle_bin_router)
+app.include_router(contact_router)
 
 # ===== Root Endpoint =====
 @app.get("/")

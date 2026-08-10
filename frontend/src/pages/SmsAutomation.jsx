@@ -1,3 +1,4 @@
+import { formatIST } from '../utils/dateUtils';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   getSmsSettings,
@@ -205,11 +206,7 @@ const SmsAutomation = () => {
   // Format date helper
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
-             d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    } catch { return dateStr; }
+    return formatIST(dateStr);
   };
 
   const tabs = [

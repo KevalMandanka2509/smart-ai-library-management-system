@@ -6,7 +6,8 @@ from datetime import datetime
 from ..database import get_db
 from ..models.student import student_document, serialize_student, serialize_students
 from ..schemas.student import StudentCreate, StudentUpdate, StudentResponse
-from ..core.security import get_current_user, get_current_admin
+from ..core.security import get_current_user
+from ..core.rbac import has_permission
 
 router = APIRouter(prefix="/api/v1/students", tags=["Students"])
 
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/api/v1/students", tags=["Students"])
 async def create_student(
     student: StudentCreate, 
     db=Depends(get_db), 
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("students:manage"))
 ):
     """
     Add a new student to the library system.
@@ -57,7 +58,7 @@ async def get_all_students(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("students:manage"))
 ):
     """
     Get all students with pagination.
@@ -103,7 +104,7 @@ async def get_student(
         )
         
     # Enforce authorization: Non-admins can only view their own student details
-    if current_user.get("role") != "admin":
+    if current_user.get("role") not in ["admin", "librarian"]:
         if student.get("student_id") != current_user.get("username") and student.get("email", "").lower() != current_user.get("email", "").lower():
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -142,7 +143,7 @@ async def update_student(
         )
         
     # Enforce authorization: Non-admins can only update their own student details
-    if current_user.get("role") != "admin":
+    if current_user.get("role") not in ["admin", "librarian"]:
         if student.get("student_id") != current_user.get("username") and student.get("email", "").lower() != current_user.get("email", "").lower():
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -152,12 +153,12 @@ async def update_student(
     update_data = student_update.dict(exclude_unset=True)
     
     # If not admin, restrict fields they can update
-    if current_user.get("role") != "admin":
+    if current_user.get("role") not in ["admin", "librarian"]:
         update_data.pop("is_active", None)
     
     # Check student_id uniqueness if being updated
     if "student_id" in update_data and update_data["student_id"] != student.get("student_id"):
-        if current_user.get("role") != "admin":
+        if current_user.get("role") not in ["admin", "librarian"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only administrators can modify student IDs"
@@ -181,19 +182,20 @@ async def update_student(
     # Add updated_at timestamp
     update_data["updated_at"] = datetime.utcnow()
     
+    from pymongo import ReturnDocument
     # Update in MongoDB
     if ObjectId.is_valid(student_id):
-        result = collection.update_one(
+        updated_student = collection.find_one_and_update(
             {"_id": ObjectId(student_id)},
-            {"$set": update_data}
+            {"$set": update_data},
+            return_document=ReturnDocument.AFTER
         )
-        updated_student = collection.find_one({"_id": ObjectId(student_id)})
     else:
-        result = collection.update_one(
+        updated_student = collection.find_one_and_update(
             {"student_id": student_id},
-            {"$set": update_data}
+            {"$set": update_data},
+            return_document=ReturnDocument.AFTER
         )
-        updated_student = collection.find_one({"student_id": student_id})
     
     return serialize_student(updated_student)
 
@@ -204,7 +206,7 @@ async def update_student(
 async def delete_student(
     student_id: str, 
     db=Depends(get_db), 
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("students:manage"))
 ):
     """
     Delete a student from the library system.
@@ -212,6 +214,50 @@ async def delete_student(
     collection = db.students
     
     # Find and delete
+    if ObjectId.is_valid(student_id):
+        record_to_delete = collection.find_one({"_id": ObjectId(student_id)})
+    else:
+        record_to_delete = collection.find_one({"student_id": student_id})
+        
+    if not record_to_delete:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Student with ID {student_id} not found"
+        )
+        
+    actual_student_id = record_to_delete.get("student_id")
+    
+    # Safe delete checks
+    active_borrows = db.borrows.count_documents({"student_id": actual_student_id, "status": "issued"})
+    if active_borrows > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete student. They have {active_borrows} active borrow(s)."
+        )
+        
+    unpaid_fines = db.fines.count_documents({"student_id": actual_student_id, "status": "unpaid"})
+    if unpaid_fines > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete student. They have {unpaid_fines} unpaid fine(s)."
+        )
+        
+    active_reservations = db.reservations.count_documents({"student_id": actual_student_id, "status": "active"})
+    if active_reservations > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete student. They have {active_reservations} active reservation(s)."
+        )
+
+    if record_to_delete:
+        db.recycle_bin.insert_one({
+            "original_collection": "students", 
+            "record": record_to_delete, 
+            "deleted_at": datetime.utcnow(), 
+            "deleted_by": current_user.get("username", "admin") if current_user else "admin", 
+            "display_name": record_to_delete.get("name", record_to_delete.get("full_name", record_to_delete.get("title", "Deleted Record")))
+        })
+        
     if ObjectId.is_valid(student_id):
         result = collection.delete_one({"_id": ObjectId(student_id)})
     else:
@@ -238,7 +284,7 @@ async def search_students(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("students:manage"))
 ):
     """
     Search students by name, ID, email, course, department, semester.
@@ -274,7 +320,7 @@ async def search_students(
 # 7. GET STUDENT STATISTICS (Admin Only)
 # ============================================
 @router.get("/stats/")
-async def get_student_stats(db=Depends(get_db), current_admin=Depends(get_current_admin)):
+async def get_student_stats(db=Depends(get_db), current_user=Depends(has_permission("students:manage"))):
     """
     Get student statistics.
     """
@@ -319,7 +365,7 @@ async def get_student_stats(db=Depends(get_db), current_admin=Depends(get_curren
 async def bulk_delete_students(
     payload: dict,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("students:manage"))
 ):
     """
     Delete multiple students by IDs.
@@ -340,6 +386,26 @@ async def bulk_delete_students(
         else:
             custom_ids.append(sid)
 
+    
+    # Backup to recycle bin before bulk delete
+    records_to_delete = list(db.students.find({
+        "$or": [
+            {"_id": {"$in": object_ids}},
+            {"student_id": {"$in": custom_ids}}
+        ] if 'students' == 'students' else {"_id": {"$in": object_ids}}
+    }))
+    if records_to_delete:
+        recycle_docs = [
+            {
+                "original_collection": "students",
+                "record": rec,
+                "deleted_at": datetime.utcnow(),
+                "deleted_by": current_user.get("username", "admin") if current_user else "admin",
+                "display_name": rec.get("name", rec.get("full_name", rec.get("title", "Deleted Record")))
+            } for rec in records_to_delete
+        ]
+        db.recycle_bin.insert_many(recycle_docs)
+
     result = db.students.delete_many({
         "$or": [
             {"_id": {"$in": object_ids}},
@@ -355,7 +421,7 @@ async def bulk_delete_students(
 # 9. EXPORT STUDENTS CSV (Admin Only)
 # ============================================
 @router.get("/export/csv")
-async def export_students_csv(db=Depends(get_db), current_admin=Depends(get_current_admin)):
+async def export_students_csv(db=Depends(get_db), current_user=Depends(has_permission("students:manage"))):
     """
     Export all students as CSV download.
     """
@@ -392,7 +458,7 @@ async def export_students_csv(db=Depends(get_db), current_admin=Depends(get_curr
 async def import_students_csv(
     file: UploadFile,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("students:manage"))
 ):
     """
     Import students from a CSV file.

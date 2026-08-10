@@ -21,7 +21,7 @@ def record_audit_log(
         if user:
             user_id = str(user.get("_id") or user.get("id") or user.get("user_id") or "")
             u_name = user.get("username") or user.get("email") or user.get("full_name") or username
-            role = user.get("role") or "user"
+            role = user.get("role") or "member"
 
         db.audit_logs.insert_one({
             "user_id": user_id,

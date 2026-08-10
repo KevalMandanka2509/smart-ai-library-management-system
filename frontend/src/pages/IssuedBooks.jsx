@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getStudentBorrows } from '../services/api';
+import { formatIST } from '../utils/dateUtils';
 import { PageHeader, DataTable, StatusBadge } from '../components/layout/EnterpriseLibrary';
 import '../styles/design-tokens.css';
 import './Dashboard.css';
@@ -32,11 +33,7 @@ const IssuedBooks = () => {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    return formatIST(dateStr);
   };
 
   return (

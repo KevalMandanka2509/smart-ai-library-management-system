@@ -34,6 +34,7 @@ async def register(request: RegisterRequest, db=Depends(get_db)):
     
     # Create user
     user_data = request.dict()
+    user_data["role"] = "member"
     user_data["password"] = security.hash_password(user_data["password"])
     new_user = user_document(user_data)
     
@@ -89,6 +90,12 @@ async def login(request: LoginRequest, db=Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
+        )
+        
+    if not user.get("is_active", True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive or disabled"
         )
     
     # Check if account is locked
@@ -181,6 +188,12 @@ async def refresh_token(request: RefreshTokenRequest, db=Depends(get_db)):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User not found"
             )
+            
+        if not user.get("is_active", True):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is inactive or disabled"
+            )
         
         tokens = create_tokens(str(user["_id"]), user["email"])
         return tokens
@@ -232,11 +245,8 @@ async def forgot_password(request: ForgotPasswordRequest, db=Depends(get_db)):
         import logging
         logging.getLogger(__name__).warning(f"Password reset email warning: {email_err}")
 
-    print(f"🔑 PASSWORD RESET OTP FOR {request.email.lower()}: {otp}")
-    
     return {
-        "message": "Verification code sent to your email",
-        "otp": otp # Return for simple frontend demo usage
+        "message": "Verification code sent to your email"
     }
 
 # ============================================

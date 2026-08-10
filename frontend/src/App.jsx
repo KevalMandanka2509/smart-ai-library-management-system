@@ -1,6 +1,7 @@
-import React, { useState, useEffect, lazy, Suspense, Component } from 'react';
+import React, { useState, useEffect, lazy, Suspense, Component, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
+import TopNavbar from './components/layout/TopNavbar';
 import Footer from './components/layout/Footer';
 import './App.css';
 
@@ -52,6 +53,7 @@ const IssueReturn = lazy(() => import('./pages/IssueReturn'));
 const Transactions = lazy(() => import('./pages/Transactions'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
+const RecycleBin = lazy(() => import('./pages/RecycleBin'));
 const MyBooks = lazy(() => import('./pages/MyBooks'));
 const IssuedBooks = lazy(() => import('./pages/IssuedBooks'));
 const Profile = lazy(() => import('./pages/Profile'));
@@ -65,6 +67,9 @@ const AuditLogs = lazy(() => import('./pages/AuditLogs'));
 const BarcodeManagement = lazy(() => import('./pages/BarcodeManagement'));
 const EmailAutomation = lazy(() => import('./pages/EmailAutomation'));
 const SmsAutomation = lazy(() => import('./pages/SmsAutomation'));
+
+const ContactMessages = lazy(() => import('./pages/ContactMessages'));
+const Users = lazy(() => import('./pages/Users'));
 
 // Public layout wrapper (hides sidebar, shows standard navigation and copyright footer)
 const PublicLayout = () => {
@@ -81,14 +86,23 @@ const PublicLayout = () => {
 
 // Protected layout wrapper (requires active login, renders the permanent left sidebar layout)
 const ProtectedLayout = ({ isLoggedIn, userRole, handleLogout }) => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   if (!isLoggedIn) {
     // If not logged in at all, redirect to root login
     return <Navigate to="/login" replace />;
   }
 
   return (
-    <div className="App has-sidebar">
-      <Navbar isLoggedIn={true} userRole={userRole} onLogout={handleLogout} />
+    <div className={`App has-sidebar ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <TopNavbar userRole={userRole} onLogout={handleLogout} />
+      <Navbar 
+        isLoggedIn={true} 
+        userRole={userRole} 
+        onLogout={handleLogout} 
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
       <main className="app-main">
         <Outlet />
       </main>
@@ -97,14 +111,16 @@ const ProtectedLayout = ({ isLoggedIn, userRole, handleLogout }) => {
 };
 
 // Role-based authorization checker
-const RoleGuard = ({ userRole, requiredRole, children }) => {
-  const normRole = userRole === 'user' ? 'member' : userRole;
-  if (requiredRole === 'admin' && normRole !== 'admin') {
-    return <Navigate to="/dashboard" replace />;
+const RoleGuard = ({ userRole, allowedRoles, children }) => {
+  const normRole = userRole;
+  
+  if (allowedRoles && !allowedRoles.includes(normRole)) {
+    // Admin implicitly has access to all routes if they hit a RoleGuard, unless specifically excluded
+    if (normRole !== 'admin') {
+      return <Navigate to="/dashboard" replace />;
+    }
   }
-  if (requiredRole === 'member' && normRole !== 'member' && normRole !== 'admin') {
-    return <Navigate to="/dashboard" replace />;
-  }
+  
   return children ? children : <Outlet />;
 };
 
@@ -120,9 +136,9 @@ const App = () => {
     if (user) {
       try {
         const userData = JSON.parse(user);
-        return userData.role || 'user';
+        return userData.role || 'member';
       } catch {
-        return 'user';
+        return 'member';
       }
     }
     return '';
@@ -137,9 +153,9 @@ const App = () => {
         setIsLoggedIn(true);
         try {
           const userData = JSON.parse(user);
-          setUserRole(userData.role || 'user');
+          setUserRole(userData.role || 'member');
         } catch {
-          setUserRole('user');
+          setUserRole('member');
         }
       } else {
         setIsLoggedIn(false);
@@ -150,21 +166,21 @@ const App = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const handleLoginSuccess = (user, token, refreshTokenStr) => {
+  const handleLoginSuccess = useCallback((user, token, refreshTokenStr) => {
     localStorage.setItem('access_token', token);
     if (refreshTokenStr) {
       localStorage.setItem('refresh_token', refreshTokenStr);
     }
     localStorage.setItem('user', JSON.stringify(user));
     setIsLoggedIn(true);
-    setUserRole(user.role || 'user');
-  };
+    setUserRole(user.role || 'member');
+  }, []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.clear();
     setIsLoggedIn(false);
     setUserRole('');
-  };
+  }, []);
 
   return (
     <ErrorBoundary>
@@ -191,7 +207,8 @@ const App = () => {
             {/* Protected Dashboard and Configuration routes (both admin and user can access) */}
             <Route element={<ProtectedLayout isLoggedIn={isLoggedIn} userRole={userRole} handleLogout={handleLogout} />}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/settings" element={<RoleGuard roles={['admin', 'librarian']}><Settings /></RoleGuard>} />
+              <Route path="/recycle-bin" element={<RecycleBin />} />
 
               {/* Shared routes: both admin and members can browse book catalogue and view profile */}
               <Route path="/books" element={<Books />} />
@@ -202,22 +219,29 @@ const App = () => {
               <Route path="/search" element={<AdvancedSearch />} />
               <Route path="/profile" element={<Profile />} />
 
-              {/* Admin Specific Protected Routes */}
-              <Route element={<RoleGuard userRole={userRole} requiredRole="admin" />}>
+              {/* Core Admin & Librarian Shared Routes */}
+              <Route element={<RoleGuard userRole={userRole} allowedRoles={['admin', 'librarian']} />}>
                 <Route path="/students" element={<Students />} />
-                <Route path="/barcodes" element={<BarcodeManagement />} />
                 <Route path="/issue-return" element={<IssueReturn />} />
                 <Route path="/transactions" element={<Transactions />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/authors" element={<Authors />} />
                 <Route path="/categories" element={<Categories />} />
+                <Route path="/librarian" element={<Dashboard />} />
+                <Route path="/contact-messages" element={<ContactMessages />} />
+              </Route>
+
+              {/* Strict Admin-Only Routes */}
+              <Route element={<RoleGuard userRole={userRole} allowedRoles={['admin']} />}>
+                <Route path="/users" element={<Users />} />
+                <Route path="/barcodes" element={<BarcodeManagement />} />
                 <Route path="/audit-logs" element={<AuditLogs />} />
                 <Route path="/email-automation" element={<EmailAutomation />} />
                 <Route path="/sms-automation" element={<SmsAutomation />} />
               </Route>
 
               {/* User Specific Protected Routes */}
-              <Route element={<RoleGuard userRole={userRole} requiredRole="member" />}>
+              <Route element={<RoleGuard userRole={userRole} allowedRoles={['member', 'admin']} />}>
                 <Route path="/my-books" element={<MyBooks />} />
                 <Route path="/issued-books" element={<IssuedBooks />} />
               </Route>

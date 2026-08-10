@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import base64
 from bson import ObjectId
 
 from ..database import get_db
-from ..core.security import get_current_user, get_current_admin, security
+from ..core.security import get_current_user, security
+from ..core.rbac import has_permission
 
 router = APIRouter(prefix="/api/v1", tags=["Profile & Admin Management"])
 
@@ -29,12 +30,28 @@ class UserCreateAdmin(BaseModel):
     email: EmailStr
     full_name: str
     password: str
-    role: str = "librarian" # admin, librarian, staff, member
+    role: str = "librarian" # admin, librarian, member
     permissions: Optional[List[str]] = []
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v):
+        valid_roles = {"admin", "librarian", "member"}
+        if v not in valid_roles:
+            raise ValueError(f"Role must be one of: {', '.join(valid_roles)}")
+        return v
 
 class UpdateRolePermissions(BaseModel):
     role: str
     permissions: List[str]
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v):
+        valid_roles = {"admin", "librarian", "member"}
+        if v not in valid_roles:
+            raise ValueError(f"Role must be one of: {', '.join(valid_roles)}")
+        return v
 
 # ─────────────────────────────────────────────
 # System Permissions Catalog
@@ -43,19 +60,26 @@ SYSTEM_PERMISSIONS = [
     {"code": "books:read", "name": "View Books", "category": "Books"},
     {"code": "books:write", "name": "Create & Edit Books", "category": "Books"},
     {"code": "books:delete", "name": "Delete Books", "category": "Books"},
+    {"code": "authors:write", "name": "Create & Edit Authors", "category": "Books"},
+    {"code": "authors:delete", "name": "Delete Authors", "category": "Books"},
+    {"code": "categories:write", "name": "Create & Edit Categories", "category": "Books"},
+    {"code": "categories:delete", "name": "Delete Categories", "category": "Books"},
     {"code": "borrows:manage", "name": "Issue & Return Books", "category": "Circulation"},
     {"code": "fines:manage", "name": "Manage & Collect Fines", "category": "Circulation"},
     {"code": "reservations:manage", "name": "Manage Reservations", "category": "Circulation"},
     {"code": "students:manage", "name": "Manage Student Accounts", "category": "Users"},
     {"code": "reports:view", "name": "View Analytics & Reports", "category": "Analytics"},
+    {"code": "contact:manage", "name": "Manage Contact Messages", "category": "Admin"},
+    {"code": "notifications:manage", "name": "Manage System Notifications", "category": "Admin"},
+    {"code": "profile:read", "name": "View User Profiles", "category": "Users"},
+    {"code": "profile:write", "name": "Edit User Profiles", "category": "Users"},
     {"code": "admin:manage", "name": "Full System Administration", "category": "Admin"}
 ]
 
 ROLE_DEFAULT_PERMISSIONS = {
     "admin": [p["code"] for p in SYSTEM_PERMISSIONS],
-    "librarian": ["books:read", "books:write", "borrows:manage", "fines:manage", "reservations:manage", "students:manage", "reports:view"],
-    "staff": ["books:read", "borrows:manage", "reservations:manage"],
-    "member": ["books:read"]
+    "librarian": ["books:read", "books:write", "authors:write", "categories:write", "borrows:manage", "fines:manage", "reservations:manage", "students:manage", "reports:view", "contact:manage", "notifications:manage", "profile:read", "profile:write"],
+    "member": ["books:read", "profile:read", "profile:write"]
 }
 
 # Audit Log Helper
@@ -63,7 +87,7 @@ def log_audit(db, user: dict, action: str, resource: str, details: str = ""):
     db.audit_logs.insert_one({
         "user_id": str(user.get("_id") or user.get("id", "")),
         "username": user.get("username", "Unknown"),
-        "role": user.get("role", "user"),
+        "role": user.get("role", "member"),
         "action": action,
         "resource": resource,
         "details": details,
@@ -87,7 +111,7 @@ async def get_my_profile(db=Depends(get_db), current_user=Depends(get_current_us
 
     # Fetch activity history & student record if member
     student_info = {}
-    if user.get("role") in ["member", "user"]:
+    if user.get("role") == "member":
         st = db.students.find_one({"student_id": user.get("username")}) or db.students.find_one({"email": user.get("email")})
         if st:
             student_info = {
@@ -116,14 +140,27 @@ async def get_my_profile(db=Depends(get_db), current_user=Depends(get_current_us
     # Sort combined activity
     activities.sort(key=lambda x: x["timestamp"] or "", reverse=True)
 
-    # Active sessions mockup / token log
-    sessions = [{
-        "id": "sess_current",
-        "device": "Web Browser (Current Session)",
-        "ip": "127.0.0.1",
-        "last_active": user.get("last_login", datetime.utcnow()).isoformat() if isinstance(user.get("last_login"), datetime) else str(user.get("last_login", "Active now")),
-        "is_current": True
-    }]
+
+    # Fetch real active sessions
+    active_sessions_cursor = db.chat_sessions.find({"user_id": str(user["_id"])})
+    sessions = []
+    for s in active_sessions_cursor:
+        sessions.append({
+            "id": str(s.get("_id")),
+            "device": s.get("device", "Web Browser"),
+            "ip": s.get("ip", "Unknown"),
+            "last_active": s.get("last_active", datetime.utcnow()).isoformat() if isinstance(s.get("last_active"), datetime) else str(s.get("last_active", "Active now")),
+            "is_current": False
+        })
+    if not sessions:
+        sessions = [{
+            "id": "sess_current",
+            "device": "Web Browser (Current Session)",
+            "ip": "127.0.0.1",
+            "last_active": "Active now",
+            "is_current": True
+        }]
+
 
     return {
         "id": str(user["_id"]),
@@ -162,7 +199,7 @@ async def update_my_profile(
         db.users.update_one(query, {"$set": update_fields})
 
     # Also update student document if exists
-    if user.get("role") in ["member", "user"]:
+    if user.get("role") == "member":
         st_update = {}
         if payload.full_name is not None: st_update["full_name"] = payload.full_name
         if payload.phone is not None: st_update["phone"] = payload.phone
@@ -233,13 +270,13 @@ async def change_password(
 # 2. ADMIN MANAGEMENT ENDPOINTS (Admin Only)
 # ─────────────────────────────────────────────
 @router.get("/admin/permissions")
-async def get_permissions_catalog(current_admin=Depends(get_current_admin)):
+async def get_permissions_catalog(current_user=Depends(has_permission("admin:manage"))):
     return {"permissions": SYSTEM_PERMISSIONS, "role_defaults": ROLE_DEFAULT_PERMISSIONS}
 
 @router.get("/admin/users")
 async def get_all_users_admin(
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("admin:manage"))
 ):
     users_cursor = db.users.find().sort("username", 1)
     users = []
@@ -262,7 +299,7 @@ async def get_all_users_admin(
 async def create_user_admin(
     payload: UserCreateAdmin,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("admin:manage"))
 ):
     if db.users.find_one({"email": payload.email.lower()}):
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -291,7 +328,7 @@ async def update_user_role_permissions(
     user_id: str,
     payload: UpdateRolePermissions,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("admin:manage"))
 ):
     if not ObjectId.is_valid(user_id):
         raise HTTPException(status_code=400, detail="Invalid User ID format")
@@ -311,12 +348,105 @@ async def update_user_role_permissions(
     )
     return {"message": "User role and permissions updated successfully"}
 
+class UserUpdateAdmin(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+
+@router.put("/admin/users/{user_id}")
+async def update_user_admin(
+    user_id: str,
+    payload: UserUpdateAdmin,
+    db=Depends(get_db),
+    current_user=Depends(has_permission("admin:manage"))
+):
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid User ID format")
+
+    user = db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Cannot modify the root admin
+    if user.get("username") == "admin" and payload.email:
+        # Just a safety check if we want to prevent modifying the root admin too much
+        pass
+
+    update_fields = {}
+    if payload.full_name is not None:
+        update_fields["full_name"] = payload.full_name
+        
+    if payload.email is not None and payload.email.lower() != user.get("email"):
+        if db.users.find_one({"email": payload.email.lower()}):
+            raise HTTPException(status_code=400, detail="Email already registered")
+        update_fields["email"] = payload.email.lower()
+        
+    if payload.password:
+        if not security.validate_password_strength(payload.password):
+            raise HTTPException(
+                status_code=400,
+                detail="Password must be at least 8 characters long and contain at least one uppercase letter, "
+                       "one lowercase letter, one number, and one special character."
+            )
+        update_fields["password"] = security.hash_password(payload.password)
+
+    if update_fields:
+        db.users.update_one({"_id": ObjectId(user_id)}, {"$set": update_fields})
+        log_audit(db, current_user, "UPDATE_USER", f"User:{user.get('username')}", "Updated user details")
+        
+    return {"message": "User updated successfully"}
+
+@router.delete("/admin/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user_admin(
+    user_id: str,
+    db=Depends(get_db),
+    current_user=Depends(has_permission("admin:manage"))
+):
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid User ID format")
+
+    user = db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if user.get("username") == "admin":
+        raise HTTPException(status_code=400, detail="Cannot delete the root admin account")
+        
+    if str(user.get("_id")) == str(current_user.get("_id")):
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+
+    # Soft delete: move to recycle bin
+    db.recycle_bin.insert_one({
+        "original_collection": "users",
+        "record": user,
+        "deleted_at": datetime.utcnow(),
+        "deleted_by": current_user.get("username", "admin"),
+        "display_name": user.get("username", "Unknown User")
+    })
+    
+    db.users.delete_one({"_id": ObjectId(user_id)})
+    
+    # Also delete associated student record if it exists
+    student = db.students.find_one({"student_id": user.get("username")})
+    if student:
+        db.recycle_bin.insert_one({
+            "original_collection": "students",
+            "record": student,
+            "deleted_at": datetime.utcnow(),
+            "deleted_by": current_admin.get("username", "admin"),
+            "display_name": student.get("full_name", user.get("username"))
+        })
+        db.students.delete_one({"student_id": user.get("username")})
+
+    log_audit(db, current_admin, "DELETE_USER", f"User:{user.get('username')}", "Deleted user and associated records")
+    return None
+
 @router.get("/admin/audit-logs")
 async def get_audit_logs(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("admin:manage"))
 ):
     total = db.audit_logs.count_documents({})
     skip = (page - 1) * page_size

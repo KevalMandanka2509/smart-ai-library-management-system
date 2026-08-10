@@ -1,3 +1,4 @@
+import { formatIST } from '../utils/dateUtils';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   getMyProfile,
@@ -11,6 +12,7 @@ import {
   getAuditLogs
 } from '../services/api';
 import { Copy, Check } from 'lucide-react';
+import { PageHeader } from '../components/layout/EnterpriseLibrary';
 import './Students.css';
 import './Dashboard.css';
 
@@ -571,7 +573,7 @@ const Profile = () => {
                   <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: act.type === 'borrow' ? '#3b82f6' : '#16a34a' }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#1e1b15' }}>{act.action}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{act.timestamp ? new Date(act.timestamp).toLocaleString() : 'Recent'}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{act.timestamp ? formatIST(act.timestamp) : 'Recent'}</div>
                   </div>
                 </div>
               ))}
@@ -689,7 +691,7 @@ const Profile = () => {
                   ) : (
                     auditLogs.map(log => (
                       <tr key={log.id}>
-                        <td style={{ fontSize: '0.8rem', color: '#5c5549' }}>{new Date(log.timestamp).toLocaleString()}</td>
+                        <td style={{ fontSize: '0.8rem', color: '#5c5549' }}>{formatIST(log.timestamp)}</td>
                         <td style={{ fontWeight: '700' }}>{log.username} <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>({log.role})</span></td>
                         <td><span style={{ fontWeight: '700', color: '#D4A017' }}>{log.action}</span></td>
                         <td style={{ fontSize: '0.85rem' }}>{log.resource}</td>
@@ -724,7 +726,6 @@ const Profile = () => {
                 <input required type="password" placeholder="Initial Password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} style={{ padding: '0.65rem', borderRadius: '8px', border: '1px solid #d1d5db' }} />
                 <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} style={{ padding: '0.65rem', borderRadius: '8px', border: '1px solid #d1d5db' }}>
                   <option value="librarian">Librarian</option>
-                  <option value="staff">Staff Assistant</option>
                   <option value="admin">System Admin</option>
                 </select>
               </div>
@@ -753,7 +754,6 @@ const Profile = () => {
               >
                 <option value="admin">Admin (Full Access)</option>
                 <option value="librarian">Librarian</option>
-                <option value="staff">Staff Assistant</option>
                 <option value="member">Student / Member</option>
               </select>
             </div>
@@ -789,3 +789,4 @@ const Profile = () => {
 };
 
 export default Profile;
+

@@ -5,7 +5,8 @@ from typing import List
 
 from ..database import get_db
 from ..schemas.reservation import ReservationRequest, ReservationResponse
-from ..core.security import get_current_user, get_current_admin
+from ..core.security import get_current_user
+from ..core.rbac import has_permission
 
 router = APIRouter(prefix="/api/v1/reservations", tags=["Reservations"])
 
@@ -141,4 +142,39 @@ async def cancel_reservation(id: str, db=Depends(get_db), current_user=Depends(g
         {"_id": ObjectId(id)},
         {"$set": {"status": "cancelled"}}
     )
+
+    # If the reservation was already 'ready', it means a physical copy was being held. We must release it.
+    if res.get("status") == "ready":
+        book_id = res["book_id"]
+        # Check for next pending reservation
+        next_res = db.reservations.find_one(
+            {"book_id": book_id, "status": "pending"},
+            sort=[("reserved_at", 1)]
+        )
+        
+        if next_res:
+            # Pass the held copy to the next reserver
+            db.reservations.update_one(
+                {"_id": next_res["_id"]},
+                {"$set": {"status": "ready"}}
+            )
+            from ..utils.notification_helper import create_notification
+            import asyncio
+            asyncio.create_task(create_notification(
+                db,
+                student_id=next_res["student_id"],
+                title="Reserved Book Ready",
+                message=f"The book '{res.get('book_title')}' you reserved is now ready for pickup.",
+                n_type="reservation_update"
+            ))
+        else:
+            # No other reservers, return copy to general circulation
+            db.books.update_one(
+                {"_id": ObjectId(book_id)},
+                {
+                    "$inc": {"available_copies": 1},
+                    "$set": {"is_available": True}
+                }
+            )
+
     return {"message": "Reservation successfully cancelled."}

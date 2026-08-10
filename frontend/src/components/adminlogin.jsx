@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { login } from '../services/api';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.webp';
 import './adminlogin.css';
 
 const AdminLogin = ({ onLoginSuccess }) => {

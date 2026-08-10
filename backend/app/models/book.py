@@ -39,6 +39,12 @@ def serialize_book(book: dict) -> dict:
     if book and "_id" in book:
         book["id"] = str(book["_id"])
         del book["_id"]
+    if book:
+        book.setdefault("is_available", book.get("available_copies", 0) > 0)
+        book.setdefault("total_copies", 1)
+        book.setdefault("available_copies", 1)
+        book.setdefault("price", 0.0)
+        book.setdefault("created_at", datetime.utcnow())
     return book
 
 def serialize_books(books: list) -> list:

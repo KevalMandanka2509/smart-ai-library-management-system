@@ -20,7 +20,11 @@ import './Students.css';
 import './Dashboard.css';
 
 const Settings = () => {
-  const [activeTab, setActiveTab] = useState('general'); // general, library, borrow, fine, email, backup, branding
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const userRole = user?.role || 'member';
+
+  const [activeTab, setActiveTab] = useState(userRole === 'admin' ? 'general' : 'library'); // general, library, borrow, fine, email, backup, branding
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -226,7 +230,11 @@ const Settings = () => {
           ['borrow', 'Borrowing'],
           ['fine', 'Fines & Fees'],
           ['email', 'Email & SMTP']
-        ].map(([tab, label]) => (
+        ].filter(([tab, label]) => {
+          if (userRole === 'admin') return true;
+          if (userRole === 'librarian') return ['library', 'borrow', 'fine'].includes(tab);
+          return false; // member/user gets no tabs or access
+        }).map(([tab, label]) => (
           <button
             key={tab}
             onClick={() => { setActiveTab(tab); setError(''); setSuccess(''); }}
@@ -596,3 +604,4 @@ const Settings = () => {
 };
 
 export default Settings;
+

@@ -7,6 +7,7 @@ from ..database import get_db
 from ..models.book import book_document, serialize_book, serialize_books
 from ..schemas.book import BookCreate, BookUpdate, BookResponse
 from ..core.security import get_current_user, get_current_admin
+from ..core.rbac import has_permission
 
 router = APIRouter(prefix="/api/v1/books", tags=["Books"])
 
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/api/v1/books", tags=["Books"])
 # 1. CREATE BOOK - Add New Book (Admin Only)
 # ============================================
 @router.post("/", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
-async def create_book(book: BookCreate, db=Depends(get_db), current_admin=Depends(get_current_admin)):
+async def create_book(book: BookCreate, db=Depends(get_db), current_user=Depends(has_permission("books:write"))):
     """
     Add a new book to the library.
     - Checks if ISBN already exists
@@ -54,11 +55,19 @@ async def get_all_books(
     """
     Get all books with pagination.
     """
+    print("GET_ALL_BOOKS: START")
     collection = db.books
     
+    print("GET_ALL_BOOKS: EXECUTING FIND")
     books = collection.find().skip(skip).limit(limit)
     
-    return serialize_books(list(books))
+    print("GET_ALL_BOOKS: CONVERTING TO LIST")
+    books_list = list(books)
+    print(f"GET_ALL_BOOKS: FOUND {len(books_list)} BOOKS")
+    
+    result = serialize_books(books_list)
+    print("GET_ALL_BOOKS: SERIALIZED, RETURNING")
+    return result
 
 # ============================================
 # 3. GET BOOK DETAILS - View Single Book (Registered Users)
@@ -95,7 +104,7 @@ async def update_book(
     book_id: str,
     book_update: BookUpdate,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("books:write"))
 ):
     """
     Update book details.
@@ -135,20 +144,19 @@ async def update_book(
     # Add updated_at timestamp
     update_data["updated_at"] = datetime.utcnow()
     
-    # Update in MongoDB
-    result = collection.update_one(
+    from pymongo import ReturnDocument
+    # Update in MongoDB and return updated document
+    updated_book = collection.find_one_and_update(
         {"_id": ObjectId(book_id)},
-        {"$set": update_data}
+        {"$set": update_data},
+        return_document=ReturnDocument.AFTER
     )
     
-    if result.matched_count == 0:
+    if not updated_book:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Book with ID {book_id} not found"
         )
-    
-    # Get updated book
-    updated_book = collection.find_one({"_id": ObjectId(book_id)})
     
     return serialize_book(updated_book)
 
@@ -156,7 +164,7 @@ async def update_book(
 # 5. DELETE BOOK - Delete Book (Admin Only)
 # ============================================
 @router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_book(book_id: str, db=Depends(get_db), current_admin=Depends(get_current_admin)):
+async def delete_book(book_id: str, db=Depends(get_db), current_user=Depends(has_permission("books:delete"))):
     """
     Delete a book from the library.
     """
@@ -169,6 +177,29 @@ async def delete_book(book_id: str, db=Depends(get_db), current_admin=Depends(ge
             detail="Invalid book ID format"
         )
     
+    result = book = collection.find_one({"_id": ObjectId(book_id)})
+    if not book:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Book with ID {book_id} not found"
+        )
+        
+    # Safe delete checks
+    active_borrows = db.borrows.count_documents({"book_id": book_id, "status": "issued"})
+    if active_borrows > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete book. There are {active_borrows} active borrow(s) for this book."
+        )
+        
+    active_reservations = db.reservations.count_documents({"book_id": book_id, "status": "active"})
+    if active_reservations > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete book. There are {active_reservations} active reservation(s) for this book."
+        )
+    if book:
+        db.recycle_bin.insert_one({"original_collection": "books", "record": book, "deleted_at": datetime.utcnow(), "deleted_by": current_user.get("username", "admin"), "display_name": book.get("title", "Unknown Book")})
     result = collection.delete_one({"_id": ObjectId(book_id)})
     
     if result.deleted_count == 0:
@@ -245,7 +276,7 @@ async def filter_available_books(
 # 8. GET BOOK STATISTICS (Admin Only)
 # ============================================
 @router.get("/stats/")
-async def get_book_stats(db=Depends(get_db), current_admin=Depends(get_current_admin)):
+async def get_book_stats(db=Depends(get_db), current_user=Depends(has_permission("reports:view"))):
     """
     Get library statistics.
     """
@@ -375,7 +406,7 @@ async def browse_books(
 async def bulk_delete_books(
     payload: dict,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("books:delete"))
 ):
     """
     Delete multiple books by IDs.
@@ -403,6 +434,10 @@ async def bulk_delete_books(
             )
         object_ids.append(ObjectId(bid))
 
+    result = books = list(db.books.find({"_id": {"$in": object_ids}}))
+    if books:
+        recycle_docs = [{"original_collection": "books", "record": b, "deleted_at": datetime.utcnow(), "deleted_by": current_user.get("username", "admin"), "display_name": b.get("title", "Unknown Book")} for b in books]
+        db.recycle_bin.insert_many(recycle_docs)
     result = db.books.delete_many({"_id": {"$in": object_ids}})
     return {
         "message": f"Successfully deleted {result.deleted_count} book(s)",
@@ -413,7 +448,7 @@ async def bulk_delete_books(
 # 12. EXPORT BOOKS CSV (Admin Only)
 # ============================================
 @router.get("/export/csv")
-async def export_books_csv(db=Depends(get_db), current_admin=Depends(get_current_admin)):
+async def export_books_csv(db=Depends(get_db), current_user=Depends(has_permission("books:read"))):
     """
     Export all books as CSV download.
     """
@@ -451,7 +486,7 @@ async def export_books_csv(db=Depends(get_db), current_admin=Depends(get_current
 async def import_books_csv(
     file: UploadFile,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("books:write"))
 ):
     """
     Import books from a CSV file.
@@ -548,3 +583,4 @@ async def import_books_csv(
         "skipped": skipped,
         "errors": errors[:20]  # cap error messages
     }
+

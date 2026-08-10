@@ -8,7 +8,8 @@ import logging
 from ..database import get_db
 from ..models.author import author_document, serialize_author, serialize_authors
 from ..schemas.author import AuthorCreate, AuthorUpdate, AuthorResponse
-from ..core.security import get_current_user, get_current_admin
+from ..core.security import get_current_user
+from ..core.rbac import has_permission
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/api/v1/authors", tags=["Authors"])
 async def create_author(
     author: AuthorCreate,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("authors:write"))
 ):
     """
     Add a new author to the library.
@@ -156,7 +157,7 @@ async def update_author(
     author_id: str,
     author_update: AuthorUpdate,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("authors:write"))
 ):
     """
     Update author details.
@@ -225,7 +226,7 @@ async def update_author(
 async def delete_author(
     author_id: str,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("authors:delete"))
 ):
     """
     Soft delete an author.
@@ -263,18 +264,21 @@ async def delete_author(
             detail=f"Cannot delete author '{author.get('name')}'. {books_with_author} book(s) are still associated with this author. Please reassign or remove books first."
         )
 
-    # Soft delete
-    collection.update_one(
-        {"_id": ObjectId(author_id)},
-        {"$set": {
-            "is_deleted": True,
-            "status": "inactive",
-            "updated_at": datetime.utcnow()
-        }}
-    )
+    # Insert into recycle bin
+    db.recycle_bin.insert_one({
+        "original_collection": "authors",
+        "record": author,
+        "deleted_at": datetime.utcnow(),
+        "deleted_by": current_user.get("username", "admin"),
+        "display_name": author.get("name", "Unknown Author")
+    })
 
-    logger.info(f"🗑️ Author soft-deleted: {author.get('name')} (ID: {author_id})")
+    # Hard delete from authors collection
+    collection.delete_one({"_id": ObjectId(author_id)})
+
+    logger.info(f"🗑️ Author moved to recycle bin: {author.get('name')} (ID: {author_id})")
     return {
         "message": f"Author '{author.get('name')}' has been deleted successfully",
         "id": author_id
     }
+

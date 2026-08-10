@@ -12,7 +12,7 @@ class Settings:
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
     
     # ===== MongoDB Settings =====
-    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://127.0.0.1:27017")
     DATABASE_NAME: str = os.getenv("DATABASE_NAME", "library_db")
     
     # ===== JWT Settings =====

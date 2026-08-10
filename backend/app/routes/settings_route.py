@@ -6,7 +6,7 @@ import base64
 import json
 
 from ..database import get_db
-from ..core.security import get_current_admin
+from ..core.security import get_current_admin, get_current_user
 
 router = APIRouter(prefix="/api/v1/settings", tags=["System Settings"])
 
@@ -79,26 +79,38 @@ async def get_system_settings(db=Depends(get_db)):
 async def update_system_settings(
     payload: SystemSettingsSchema,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(get_current_user)
 ):
+    role = current_user.get("role", "member")
+    if role not in ["admin", "librarian"]:
+        raise HTTPException(status_code=403, detail="Not authorized to update settings")
+
     existing = db.settings.find_one({"_id": "global_config"}) or {"_id": "global_config", **DEFAULT_SETTINGS}
     
     update_data = {}
-    if payload.general:
-        update_data["general"] = {**(existing.get("general") or {}), **payload.general}
+    
+    # Admin can update everything
+    if role == "admin":
+        if payload.general:
+            update_data["general"] = {**(existing.get("general") or {}), **payload.general}
+        if payload.email:
+            update_data["email"] = {**(existing.get("email") or {}), **payload.email}
+        if payload.branding:
+            update_data["branding"] = {**(existing.get("branding") or {}), **payload.branding}
+            
+    # Both Admin and Librarian can update library, borrow, fine
     if payload.library:
         update_data["library"] = {**(existing.get("library") or {}), **payload.library}
     if payload.borrow:
         update_data["borrow"] = {**(existing.get("borrow") or {}), **payload.borrow}
     if payload.fine:
         update_data["fine"] = {**(existing.get("fine") or {}), **payload.fine}
-    if payload.email:
-        update_data["email"] = {**(existing.get("email") or {}), **payload.email}
-    if payload.branding:
-        update_data["branding"] = {**(existing.get("branding") or {}), **payload.branding}
+
+    if not update_data:
+        return {"message": "No allowed settings provided for update"}
 
     update_data["updated_at"] = datetime.utcnow()
-    update_data["updated_by"] = current_admin.get("username", "admin")
+    update_data["updated_by"] = current_user.get("username", "system")
 
     db.settings.update_one(
         {"_id": "global_config"},

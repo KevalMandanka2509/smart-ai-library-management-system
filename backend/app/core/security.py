@@ -157,6 +157,13 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found in data store"
         )
+
+    if not user.get("is_active", True):
+        Security.audit_log("USER_AUTHENTICATION", "ACCOUNT_DISABLED", str(user_id), client_ip)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive or disabled"
+        )
         
     return user
 

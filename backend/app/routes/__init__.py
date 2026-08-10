@@ -16,6 +16,9 @@ from .backup_route import router as backup_router
 from .email_route import router as email_router
 from .barcodes import router as barcodes_router
 from .sms_route import router as sms_router
+from .recycle_bin import router as recycle_bin_router
+from .recommendations import router as recommendations_router
+from .contact import router as contact_router
 
 # Export all routers
 __all__ = [
@@ -36,5 +39,8 @@ __all__ = [
     "backup_router",
     "email_router",
     "barcodes_router",
-    "sms_router"
+    "sms_router",
+    "recycle_bin_router",
+    "recommendations_router",
+    "contact_router"
 ]

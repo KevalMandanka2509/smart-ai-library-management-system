@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getBook, deleteBook } from '../../services/api';
+import { formatIST } from '../../utils/dateUtils';
 
 const BookDetails = ({ bookId, onBack }) => {
   const [book, setBook] = useState(null);
@@ -117,15 +118,15 @@ const BookDetails = ({ bookId, onBack }) => {
           </div>
           <div className="detail-row">
             <label>Price:</label>
-            <span>${book.price?.toFixed(2) || '0.00'}</span>
+            <span>₹{book.price?.toFixed(2) || '0.00'}</span>
           </div>
           <div className="detail-row">
             <label>Created:</label>
-            <span>{new Date(book.created_at).toLocaleDateString()}</span>
+            <span>{formatIST(book.created_at)}</span>
           </div>
           <div className="detail-row">
             <label>Last Updated:</label>
-            <span>{book.updated_at ? new Date(book.updated_at).toLocaleDateString() : 'N/A'}</span>
+            <span>{book.updated_at ? formatIST(book.updated_at) : 'N/A'}</span>
           </div>
         </div>
 

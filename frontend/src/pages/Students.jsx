@@ -51,7 +51,7 @@ const Students = () => {
     try {
       setLoading(true);
       setError('');
-      
+
       let data = [];
       if (searchTerm.trim()) {
         data = await searchStudents({ query: searchTerm });
@@ -79,7 +79,7 @@ const Students = () => {
       }
 
       setTotalStudentsCount(filtered.length);
-      
+
       // Pagination slice
       const startIndex = (currentPage - 1) * pageSize;
       const paginated = filtered.slice(startIndex, startIndex + pageSize);
@@ -145,7 +145,7 @@ const Students = () => {
   };
 
   const toggleSelectStudent = (id) => {
-    setSelectedStudentIds(prev => 
+    setSelectedStudentIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
@@ -178,9 +178,9 @@ const Students = () => {
 
   if (viewingStudent) {
     return (
-      <StudentDetails 
-        studentId={viewingStudent} 
-        onBack={() => setViewingStudent(null)} 
+      <StudentDetails
+        studentId={viewingStudent}
+        onBack={() => setViewingStudent(null)}
         onEdit={(student) => {
           setViewingStudent(null);
           handleEdit(student);
@@ -304,8 +304,8 @@ const Students = () => {
         </div>
       ) : students.length === 0 ? (
         <div style={{ background: '#fff', borderRadius: '12px', padding: '2rem', border: '1px solid var(--eu-color-border-main)' }}>
-          <EmptyState 
-            message="No students matching search parameters or filters were found." 
+          <EmptyState
+            message="No students matching search parameters or filters were found."
             description="Clear search queries or filters to browse all students."
           />
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
@@ -325,18 +325,18 @@ const Students = () => {
                     style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                   />
                 </div>
-                
+
                 <div className="student-card-header" style={{ paddingLeft: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.75rem' }}>
                   <div className="student-info">
                     <h3 style={{ margin: 0, fontSize: 'var(--eu-font-size-lg)', fontWeight: '800', color: 'var(--eu-color-text-main)' }}>{student.full_name}</h3>
                     <span className="student-id" style={{ fontSize: 'var(--eu-font-size-xs)', color: 'var(--eu-color-text-soft)', fontWeight: '600' }}>ID: {student.student_id}</span>
                   </div>
-                  <StatusBadge 
-                    label={student.is_active ? 'Active' : 'Inactive'} 
-                    variant={student.is_active ? 'success' : 'danger'} 
+                  <StatusBadge
+                    label={student.is_active ? 'Active' : 'Inactive'}
+                    variant={student.is_active ? 'success' : 'danger'}
                   />
                 </div>
-                
+
                 <div className="student-card-body" style={{ paddingLeft: '2rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '1.25rem', fontSize: 'var(--eu-font-size-sm)', color: 'var(--eu-color-text-main)' }}>
                   <p style={{ margin: 0 }}><strong>Email:</strong> {student.email}</p>
                   <p style={{ margin: 0 }}><strong>Phone:</strong> {student.phone || 'N/A'}</p>
@@ -345,7 +345,7 @@ const Students = () => {
                   <p style={{ margin: 0 }}><strong>Department:</strong> {student.department || 'N/A'}</p>
                   <p style={{ margin: 0 }}><strong>Books Borrowed:</strong> {student.books_borrowed || 0}</p>
                 </div>
-                
+
                 <div className="student-card-actions" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                   <button className="view-btn" onClick={() => setViewingStudent(student.id)}>View</button>
                   <button className="edit-btn" onClick={() => handleEdit(student)}>Edit</button>

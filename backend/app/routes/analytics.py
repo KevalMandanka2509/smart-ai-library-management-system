@@ -5,6 +5,7 @@ from typing import Optional
 
 from ..database import get_db
 from ..core.security import get_current_admin, get_current_user
+from ..core.rbac import has_permission
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics"])
 
@@ -172,7 +173,34 @@ async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(get_c
             "overdue": borrow.get("status") == "issued" and borrow.get("due_date") and borrow["due_date"] < now
         })
 
+    
+    # --- Activity Heatmap (last 365 days daily) ---
+    heatmap_start = now - timedelta(days=365)
+    heatmap_agg_issues = list(db.borrows.aggregate([
+        {"$match": {"issue_date": {"$gte": heatmap_start}}},
+        {"$group": {
+            "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$issue_date"}},
+            "count": {"$sum": 1}
+        }}
+    ]))
+    heatmap_agg_returns = list(db.borrows.aggregate([
+        {"$match": {"return_date": {"$gte": heatmap_start, "$ne": None}}},
+        {"$group": {
+            "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$return_date"}},
+            "count": {"$sum": 1}
+        }}
+    ]))
+    
+    heatmap_map = {}
+    for doc in heatmap_agg_issues:
+        heatmap_map[doc["_id"]] = heatmap_map.get(doc["_id"], 0) + doc["count"]
+    for doc in heatmap_agg_returns:
+        heatmap_map[doc["_id"]] = heatmap_map.get(doc["_id"], 0) + doc["count"]
+        
+    heatmap_data = [{"date": k, "count": v} for k, v in heatmap_map.items()]
+    
     return {
+        "heatmap": heatmap_data,
         "books": {
             "total": total_books,
             "available": available_books,
@@ -218,7 +246,7 @@ async def get_reports(
     granularity: str = Query("monthly", pattern="^(daily|weekly|monthly)$"),
     period: int = Query(12, ge=1, le=365),
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("reports:view"))
 ):
     now = datetime.utcnow()
 
@@ -368,3 +396,32 @@ async def get_reports(
         "fine_list": fine_list,
         "issue_return_list": issue_return_list
     }
+
+
+from pydantic import BaseModel
+class ScheduleRequest(BaseModel):
+    frequency: str
+    email: str
+
+@router.post("/schedule")
+async def schedule_report(req: ScheduleRequest, db=Depends(get_db)):
+    db.scheduled_reports.insert_one({
+        "frequency": req.frequency,
+        "email": req.email,
+        "created_at": datetime.utcnow()
+    })
+    return {"message": "Report scheduled successfully"}
+
+class AIRequest(BaseModel):
+    query: str
+
+@router.post("/ai")
+async def ai_assistant(req: AIRequest):
+    q = req.query.lower()
+    if "return" in q or "clearance" in q:
+        return {"action": "load_report", "type": "returns", "period": 30, "message": "Loading returns data"}
+    if "overdue" in q:
+        return {"action": "load_report", "type": "overdue", "period": 30, "message": "Loading overdue books"}
+    if "financial" in q or "fines" in q:
+        return {"action": "load_report", "type": "financial", "period": 30, "message": "Loading financial summary"}
+    return {"action": "none", "message": "I can help generate return, overdue, and financial reports. Please try one of those queries."}

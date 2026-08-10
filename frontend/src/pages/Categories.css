@@ -2,7 +2,7 @@
 /* Matches existing Students.css design system exactly */
 
 .categories-page {
-  padding: 2rem 3rem;
+  padding: 2rem 1.5rem;
   width: 100%;
   max-width: none;
   margin: 0;
@@ -32,7 +32,7 @@
 .categories-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 2rem;
+  gap: 1rem;
 }
 
 @media (max-width: 1199px) {

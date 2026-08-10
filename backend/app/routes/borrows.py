@@ -5,21 +5,22 @@ from typing import List, Optional
 
 from ..database import get_db
 from ..schemas.borrow import BorrowIssueRequest, BorrowReturnRequest, BorrowResponse
-from ..core.security import get_current_user, get_current_admin
+from ..core.security import get_current_user
+from ..core.rbac import has_permission
 
 router = APIRouter(prefix="/api/v1/borrows", tags=["Borrow Transactions"])
 
 def serialize_borrow(borrow) -> dict:
     return {
-        "id": str(borrow["_id"]),
-        "student_id": borrow["student_id"],
+        "id": str(borrow.get("_id", "")),
+        "student_id": borrow.get("student_id", ""),
         "student_name": borrow.get("student_name", "Unknown Student"),
-        "book_id": borrow["book_id"],
+        "book_id": borrow.get("book_id", ""),
         "book_title": borrow.get("book_title", "Unknown Book"),
-        "issue_date": borrow["issue_date"],
-        "due_date": borrow["due_date"],
+        "issue_date": borrow.get("issue_date"),
+        "due_date": borrow.get("due_date"),
         "return_date": borrow.get("return_date"),
-        "status": borrow["status"]
+        "status": borrow.get("status", "unknown")
     }
 
 def serialize_borrows(borrows) -> list:
@@ -29,7 +30,7 @@ def serialize_borrows(borrows) -> list:
 # 1. ISSUE BOOK (Admin Only)
 # ============================================
 @router.post("/issue", response_model=dict)
-async def issue_book(request: BorrowIssueRequest, db=Depends(get_db), current_admin=Depends(get_current_admin)):
+async def issue_book(request: BorrowIssueRequest, db=Depends(get_db), current_user=Depends(has_permission("borrows:manage"))):
     """
     Issue a book to a student.
     """
@@ -41,13 +42,14 @@ async def issue_book(request: BorrowIssueRequest, db=Depends(get_db), current_ad
             detail=f"Student with ID '{request.student_id}' not found"
         )
 
-    # 2. Verify book exists
     book_filter = {}
     if ObjectId.is_valid(request.book_id):
         book_filter["_id"] = ObjectId(request.book_id)
     else:
         book_filter["$or"] = [
             {"isbn": request.book_id},
+            {"barcode_value": request.book_id},
+            {"qr_value": request.book_id},
             {"title": {"$regex": f"^{request.book_id}$", "$options": "i"}}
         ]
         
@@ -162,7 +164,7 @@ async def issue_book(request: BorrowIssueRequest, db=Depends(get_db), current_ad
 # 2. RETURN BOOK (Admin Only)
 # ============================================
 @router.post("/return", response_model=dict)
-async def return_book(request: BorrowReturnRequest, db=Depends(get_db), current_admin=Depends(get_current_admin)):
+async def return_book(request: BorrowReturnRequest, db=Depends(get_db), current_user=Depends(has_permission("borrows:manage"))):
     """
     Return an issued book. Calculates fines and processes reservations.
     """
@@ -173,6 +175,8 @@ async def return_book(request: BorrowReturnRequest, db=Depends(get_db), current_
     else:
         book_filter["$or"] = [
             {"isbn": request.book_id},
+            {"barcode_value": request.book_id},
+            {"qr_value": request.book_id},
             {"title": {"$regex": f"^{request.book_id}$", "$options": "i"}}
         ]
         
@@ -238,6 +242,7 @@ async def return_book(request: BorrowReturnRequest, db=Depends(get_db), current_
     )
     
     from ..utils.notification_helper import create_notification
+    from ..services.email_service import EmailService
     import asyncio
 
     if oldest_res:
@@ -260,10 +265,8 @@ async def return_book(request: BorrowReturnRequest, db=Depends(get_db), current_
         db.books.update_one(
             {"_id": book["_id"]},
             {
-                "$set": {
-                    "available_copies": book.get("available_copies", 0) + 1,
-                    "is_available": True
-                }
+                "$inc": {"available_copies": 1},
+                "$set": {"is_available": True}
             }
         )
         msg = f"Book '{book['title']}' successfully returned."
@@ -320,7 +323,7 @@ async def get_transactions(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("borrows:manage"))
 ):
     search_filter = {}
     if status:
@@ -359,7 +362,7 @@ async def get_transactions(
 async def bulk_return_books(
     payload: dict,
     db=Depends(get_db),
-    current_admin=Depends(get_current_admin)
+    current_user=Depends(has_permission("borrows:manage"))
 ):
     """
     Process returns for multiple active borrowing records.
@@ -372,26 +375,41 @@ async def bulk_return_books(
             detail="transaction_ids must be a non-empty list"
         )
 
-    processed_count = 0
-    for tx_id in tx_ids:
-        if not ObjectId.is_valid(tx_id):
-            continue
-        borrow = db.borrows.find_one({"_id": ObjectId(tx_id), "status": "issued"})
-        if not borrow:
-            continue
+    tx_object_ids = [ObjectId(tx_id) for tx_id in tx_ids if ObjectId.is_valid(tx_id)]
+    if not tx_object_ids:
+        return {"message": "No valid transaction IDs provided"}
 
-        # 1. Update status
-        db.borrows.update_one(
-            {"_id": borrow["_id"]},
-            {"$set": {"status": "returned", "return_date": datetime.utcnow()}}
-        )
+    # Fetch all valid borrows in one query
+    borrows = list(db.borrows.find({"_id": {"$in": tx_object_ids}, "status": "issued"}))
+    if not borrows:
+        return {"message": "Successfully processed returns for 0 transaction(s)"}
 
-        # 2. Increment book copies
-        db.books.update_one(
-            {"_id": ObjectId(borrow["book_id"])},
-            {"$inc": {"available_copies": 1}, "$set": {"is_available": True}}
-        )
-        processed_count += 1
+    valid_borrow_ids = [b["_id"] for b in borrows]
+    
+    # 1. Update all borrows in one query
+    db.borrows.update_many(
+        {"_id": {"$in": valid_borrow_ids}},
+        {"$set": {"status": "returned", "return_date": datetime.utcnow()}}
+    )
+
+    # 2. Update all books using bulk_write to aggregate increments for same books
+    from pymongo import UpdateOne
+    book_updates = {}
+    for b in borrows:
+        book_id = b["book_id"]
+        book_updates[book_id] = book_updates.get(book_id, 0) + 1
+    
+    if book_updates:
+        bulk_operations = [
+            UpdateOne(
+                {"_id": ObjectId(bid)},
+                {"$inc": {"available_copies": count}, "$set": {"is_available": True}}
+            ) for bid, count in book_updates.items() if ObjectId.is_valid(bid)
+        ]
+        if bulk_operations:
+            db.books.bulk_write(bulk_operations)
+
+    processed_count = len(valid_borrow_ids)
 
     return {"message": f"Successfully processed returns for {processed_count} transaction(s)"}
 
@@ -419,7 +437,7 @@ async def get_student_borrows(
 # 5. GET STATS/REPORTS (Admin Only)
 # ============================================
 @router.get("/reports")
-async def get_reports_stats(db=Depends(get_db), current_admin=Depends(get_current_admin)):
+async def get_reports_stats(db=Depends(get_db), current_user=Depends(has_permission("borrows:manage"))):
     # Single aggregation instead of 3 separate count_documents calls
     pipeline = [
         {"$facet": {

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { browseBooks, getGenres, bulkDeleteBooks, exportBooksCsvUrl, importBooksCsv } from '../services/api';
 import BookForm from '../components/Books/BookForm';
 import { PageHeader, StatusBadge, EmptyState, LoadingSkeleton } from '../components/layout/EnterpriseLibrary';
+import { BookOpen, Star, Heart } from 'lucide-react';
 import '../styles/design-tokens.css';
 import './books.css';
 
@@ -147,7 +148,7 @@ const Books = () => {
   const handleCsvExport = () => {
     const token = localStorage.getItem('access_token');
     const exportUrl = exportBooksCsvUrl();
-    
+
     // Perform file download by creating a temporary anchor tag with proper authorization if required.
     // In our backend implementation, current_admin is a Dependency which checks standard authorization.
     // If the browser session is authenticated, we can direct location.href or fetch. We'll use a direct link.
@@ -184,7 +185,7 @@ const Books = () => {
   };
 
   const toggleSelectBook = (id) => {
-    setSelectedBookIds(prev => 
+    setSelectedBookIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
@@ -345,8 +346,8 @@ const Books = () => {
         </div>
       ) : books.length === 0 ? (
         <div style={{ background: '#fff', borderRadius: '12px', padding: '2rem', border: '1px solid var(--eu-color-border-main)' }}>
-          <EmptyState 
-            message="No books matching filters found." 
+          <EmptyState
+            message="No books matching filters found."
             description="Clear search queries or filters to browse all catalog items."
           />
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
@@ -357,38 +358,65 @@ const Books = () => {
         <>
           <div className="books-grid">
             {books.map((book) => (
-              <div key={book.id} className="book-card" style={{ position: 'relative', border: '1px solid var(--eu-color-border-main)', borderRadius: 'var(--eu-radius-lg)', padding: '1.5rem', background: 'var(--eu-color-bg-surface)', boxShadow: 'var(--eu-shadow-low)' }}>
-                {isAdmin && (
-                  <div style={{ position: 'absolute', top: '1rem', left: '1rem', zIndex: 10 }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedBookIds.includes(book.id)}
-                      onChange={() => toggleSelectBook(book.id)}
-                      style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              <div key={book.id} className="book-card premium-book-card">
+                <div className="card-cover-container">
+                  {isAdmin && (
+                    <div className="card-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedBookIds.includes(book.id)}
+                        onChange={() => toggleSelectBook(book.id)}
+                      />
+                    </div>
+                  )}
+                  {book.cover_image ? (
+                    <img src={book.cover_image} alt={book.title} className="card-cover-img" />
+                  ) : (
+                    <div className="card-cover-placeholder">
+                      <BookOpen size={48} color="var(--gold)" opacity={0.6} />
+                    </div>
+                  )}
+                  <div className="card-status-badge">
+                    <StatusBadge
+                      label={book.is_available ? 'Available' : 'Unavailable'}
+                      variant={book.is_available ? 'success' : 'danger'}
                     />
                   </div>
-                )}
-                <div className="book-card-header" style={{ paddingLeft: isAdmin ? '2rem' : '0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                  <h3 style={{ margin: 0, fontSize: 'var(--eu-font-size-lg)', fontWeight: '800', color: 'var(--eu-color-text-main)' }}>{book.title}</h3>
-                  <StatusBadge 
-                    label={book.is_available ? 'Available' : 'Unavailable'} 
-                    variant={book.is_available ? 'success' : 'danger'} 
-                  />
+                  <div className="card-rating-badge">
+                    <Star size={14} fill="var(--gold)" color="var(--gold)" />
+                    <span className="rating-value">4.5</span>
+                    <Heart size={14} fill="#f43f5e" color="#f43f5e" className="heart-icon" style={{ marginLeft: '6px' }} />
+                  </div>
                 </div>
-                <div className="book-card-body" style={{ paddingLeft: isAdmin ? '2rem' : '0', display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '1.25rem', fontSize: 'var(--eu-font-size-sm)', color: 'var(--eu-color-text-main)' }}>
-                  <p style={{ margin: 0 }}><strong>Author:</strong> {book.author}</p>
-                  <p style={{ margin: 0 }}><strong>ISBN:</strong> {book.isbn}</p>
-                  <p style={{ margin: 0 }}><strong>Genre:</strong> {book.genre || 'N/A'}</p>
-                  <p style={{ margin: 0 }}><strong>Copies:</strong> {book.available_copies}/{book.total_copies}</p>
-                  <p style={{ margin: 0 }}><strong>Price:</strong> ${book.price?.toFixed(2) || '0.00'}</p>
+
+                <div className="card-details-container">
+                  <h3 className="card-title" title={book.title}>{book.title}</h3>
+                  <p className="card-author">{book.author}</p>
+                  <p className="card-isbn">ISBN: {book.isbn}</p>
+
+                  <div className="card-divider"></div>
+
+                  <div className="card-stats-grid">
+                    <div className="stat-col">
+                      <span className="stat-label">COPIES</span>
+                      <span className="stat-value">{book.available_copies} / {book.total_copies}</span>
+                    </div>
+                    <div className="stat-col">
+                      <span className="stat-label">GENRE</span>
+                      <span className="stat-value">{book.genre || '—'}</span>
+                    </div>
+                    <div className="stat-col">
+                      <span className="stat-label">PRICE</span>
+                      <span className="stat-value">₹{book.price?.toFixed(2) || '0.00'}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="book-card-actions" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                  <button className="view-btn" onClick={() => navigate(`/books/${book.id}`)}>View Details</button>
+
+                <div className="card-actions-row">
+                  <button className="btn-outline btn-view" onClick={() => navigate(`/books/${book.id}`)}>View</button>
+                  <button className="btn-outline btn-edit" onClick={() => handleEdit(book)}>Edit</button>
                   {isAdmin && (
-                    <>
-                      <button className="edit-btn" onClick={() => handleEdit(book)}>Edit</button>
-                      <button className="delete-btn" onClick={() => handleDelete(book.id, book.title)}>Delete</button>
-                    </>
+                    <button className="btn-outline btn-delete" onClick={() => handleDelete(book.id, book.title)}>Delete</button>
                   )}
                 </div>
               </div>

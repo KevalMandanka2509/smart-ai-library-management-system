@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { register } from '../services/api';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.webp';
 import './LoginPage.css';
 
 const initialForm = {

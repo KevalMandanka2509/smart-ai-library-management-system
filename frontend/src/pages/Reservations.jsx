@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getActiveReservations, reserveBook, cancelReservation } from '../services/api';
+import { formatIST } from '../utils/dateUtils';
 import { PageHeader, DataTable, StatusBadge } from '../components/layout/EnterpriseLibrary';
 import '../styles/design-tokens.css';
 import './Dashboard.css'; // Reuse table styling
@@ -15,7 +16,10 @@ const Reservations = () => {
   const [studentIdInput, setStudentIdInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const [currentUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('user') || '{}'); }
+    catch { return {}; }
+  });
   const isAdmin = currentUser.role === 'admin';
 
   useEffect(() => {
@@ -72,13 +76,7 @@ const Reservations = () => {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatIST(dateStr);
   };
 
   return (

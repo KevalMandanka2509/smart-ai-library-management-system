@@ -5,13 +5,17 @@
 
 /* ===== Reset & Base ===== */
 /* ===== FULL WIDTH RESET ===== */
-html, body, #root, .App {
+html,
+body,
+#root,
+.App {
   margin: 0;
   padding: 0;
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
 }
+
 * {
   margin: 0;
   padding: 0;
@@ -35,7 +39,8 @@ html, body, #root, .App {
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-html, body {
+html,
+body {
   min-height: 100vh;
   background: var(--bg-primary);
   color: var(--text-primary);
@@ -55,6 +60,7 @@ html, body {
 
 .App.has-sidebar {
   flex-direction: row;
+  padding-top: 56px;
 }
 
 .app-main {
@@ -74,6 +80,13 @@ html, body {
     margin-left: 260px;
     width: calc(100% - 260px);
     max-width: calc(100% - 260px);
+    transition: margin-left 0.3s ease, width 0.3s ease;
+  }
+
+  .App.has-sidebar.sidebar-collapsed .app-main {
+    margin-left: 90px;
+    width: calc(100% - 90px);
+    max-width: calc(100% - 90px);
   }
 }
 
@@ -116,15 +129,37 @@ html, body {
   text-align: center;
 }
 
-.mt-1 { margin-top: 0.5rem; }
-.mt-2 { margin-top: 1rem; }
-.mt-3 { margin-top: 1.5rem; }
-.mt-4 { margin-top: 2rem; }
+.mt-1 {
+  margin-top: 0.5rem;
+}
 
-.mb-1 { margin-bottom: 0.5rem; }
-.mb-2 { margin-bottom: 1rem; }
-.mb-3 { margin-bottom: 1.5rem; }
-.mb-4 { margin-bottom: 2rem; }
+.mt-2 {
+  margin-top: 1rem;
+}
+
+.mt-3 {
+  margin-top: 1.5rem;
+}
+
+.mt-4 {
+  margin-top: 2rem;
+}
+
+.mb-1 {
+  margin-bottom: 0.5rem;
+}
+
+.mb-2 {
+  margin-bottom: 1rem;
+}
+
+.mb-3 {
+  margin-bottom: 1.5rem;
+}
+
+.mb-4 {
+  margin-bottom: 2rem;
+}
 
 /* ===== Desktop UI Scaling (Compact Dashboard ~80%) ===== */
 @media (min-width: 1024px) {

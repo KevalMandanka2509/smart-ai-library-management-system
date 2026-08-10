@@ -11,12 +11,12 @@ router = APIRouter(prefix="/api/v1/notifications", tags=["Notifications"])
 def serialize_notification(n) -> dict:
     return {
         "id": str(n["_id"]),
-        "student_id": n["student_id"],
-        "title": n["title"],
-        "message": n["message"],
-        "type": n["type"],
-        "created_at": n["created_at"],
-        "read": n["read"]
+        "student_id": n.get("student_id", ""),
+        "title": n.get("title", ""),
+        "message": n.get("message", ""),
+        "type": n.get("type", "info"),
+        "created_at": n.get("created_at"),
+        "read": n.get("read", False)
     }
 
 # ============================================
@@ -194,3 +194,21 @@ async def create_system_notification(
 
     return {"message": "Notification dispatched successfully."}
 
+# ============================================
+# 4. NOTIFICATION SETTINGS
+# ============================================
+@router.get("/settings", response_model=dict)
+async def get_notification_settings(db=Depends(get_db), current_user=Depends(get_current_user)):
+    # Mock settings response for user
+    return {
+        "email_alerts": True,
+        "sms_alerts": False,
+        "browser_alerts": True,
+        "notify_borrows": True,
+        "notify_fines": True,
+        "notify_reservations": True
+    }
+
+@router.post("/settings", response_model=dict)
+async def update_notification_settings(payload: dict, db=Depends(get_db), current_user=Depends(get_current_user)):
+    return {"message": "Settings updated successfully"}

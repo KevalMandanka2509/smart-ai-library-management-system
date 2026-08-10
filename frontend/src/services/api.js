@@ -1,9 +1,10 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -49,10 +50,12 @@ api.interceptors.response.use(
         } catch (refreshErr) {
           localStorage.clear();
           window.location.href = '/login?expired=true';
+          return Promise.reject(refreshErr);
         }
       } else {
         localStorage.clear();
         window.location.href = '/login?expired=true';
+        return Promise.reject(error);
       }
     }
     return Promise.reject(error);
@@ -440,6 +443,16 @@ export const updateUserRolePermissions = async (userId, payload) => {
   return response.data;
 };
 
+export const updateAdminUser = async (userId, payload) => {
+  const response = await api.put(`/admin/users/${userId}`, payload);
+  return response.data;
+};
+
+export const deleteAdminUser = async (userId) => {
+  const response = await api.delete(`/admin/users/${userId}`);
+  return response.data;
+};
+
 export const getAuditLogs = async (page = 1, pageSize = 20) => {
   const response = await api.get('/admin/audit-logs', { params: { page, page_size: pageSize } });
   return response.data;
@@ -684,9 +697,41 @@ export const createSystemNotification = async (payload) => {
   return response.data;
 };
 
+export const askAIReport = async (query) => {
+  const { data } = await api.post('/analytics/ai', { query });
+  return data;
+};
+
+// ===== Recommendations =====
+export const getRecommendations = async (studentId) => {
+  const response = await api.get(`/recommendations/student/${studentId}`);
+  return response.data;
+};
+
+// ===== Recycle Bin API =====
+export const getRecycleBinRecords = async (collection, page = 1, limit = 10, search = '') => {
+  const response = await api.get('/backup/recycle-bin', { params: { collection, page, limit, search } });
+  return response.data;
+};
+
+export const restoreRecord = async (collection, id) => {
+  const response = await api.post(`/backup/recycle-bin/${collection}/${id}/restore`);
+  return response.data;
+};
+
+export const permanentDeleteRecord = async (collection, id) => {
+  const response = await api.delete(`/backup/recycle-bin/${collection}/${id}`);
+  return response.data;
+};
+
+export const emptyRecycleBin = async (collection) => {
+  const response = await api.delete(`/backup/recycle-bin/${collection}/empty`);
+  return response.data;
+};
+
+export const scheduleReport = async (payload) => {
+  const { data } = await api.post('/analytics/schedule', payload);
+  return data;
+};
+
 export default api;
-
-
-
-
-

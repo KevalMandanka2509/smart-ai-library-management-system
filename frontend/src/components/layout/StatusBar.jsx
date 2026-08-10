@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+ import React, { useState, useEffect } from 'react';
 import './StatusBar.css';
 
 const StatusBar = () => {
@@ -8,13 +8,16 @@ const StatusBar = () => {
   useEffect(() => {
     const updateDateTime = () => {
       const now = new Date();
-      setCurrentTime(now.toLocaleTimeString('en-US', { 
+      setCurrentTime(now.toLocaleTimeString('en-IN', { 
+        timeZone: 'Asia/Kolkata',
         hour: '2-digit', 
-        minute: '2-digit' 
+        minute: '2-digit',
+        hour12: true
       }));
-      setCurrentDate(now.toLocaleDateString('en-US', { 
-        month: '2-digit', 
+      setCurrentDate(now.toLocaleDateString('en-IN', { 
+        timeZone: 'Asia/Kolkata',
         day: '2-digit', 
+        month: '2-digit', 
         year: 'numeric' 
       }));
     };
@@ -30,8 +33,6 @@ const StatusBar = () => {
         <span className="status-item weather">
           🌤️ 31°C Partly sunny
         </span>
-        <span className="status-divider">|</span>
-        <span className="status-item language">ENG | IN</span>
         <span className="status-divider">|</span>
         <span className="status-item time">{currentTime}</span>
         <span className="status-divider">|</span>

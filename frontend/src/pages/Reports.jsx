@@ -1,6 +1,16 @@
+import { formatIST } from '../utils/dateUtils';
 import React, { useState, useEffect, useCallback } from 'react';
 import { getAnalyticsReports } from '../services/api';
 import './Dashboard.css';
+
+// Recovered Enterprise Components
+import SavedReports from '../components/reports/SavedReports';
+import ReportScheduler from '../components/reports/ReportScheduler';
+import AIReportAssistant from '../components/reports/AIReportAssistant';
+import ActivityHeatmap from '../components/reports/ActivityHeatmap';
+import ExecutiveReport from '../components/reports/ExecutiveReport';
+import FinancialAnalytics from '../components/reports/FinancialAnalytics';
+import { BorrowActivityHeatmap } from '../components/DashboardCharts';
 
 // ─────────────────────────────────────────────────────────────
 // SVG Line Chart for trend data
@@ -128,7 +138,7 @@ function exportHTML(title, headers, rows, filename) {
 </style></head>
 <body>
 <h1>${title}</h1>
-<p>Generated: ${new Date().toLocaleString()}</p>
+<p>Generated: ${formatIST(new Date())}</p>
 <table>
   <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
   <tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c ?? '—'}</td>`).join('')}</tr>`).join('')}</tbody>
@@ -214,9 +224,16 @@ const Reports = () => {
     setPeriod(preset?.defaultPeriod || 12);
   };
 
+  const handleLoadSavedReport = (type, period) => {
+    setGranularity(type);
+    setPeriod(period);
+    setActiveTab('overview');
+    load();
+  };
+
   const fmt = (iso) => {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatIST(iso);
   };
 
   // Filtered fines
@@ -346,6 +363,10 @@ const Reports = () => {
       )}
 
       {/* ── Summary KPI cards ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+        <SavedReports onLoadReport={handleLoadSavedReport} currentConfig={{ type: granularity, period }} />
+        <ReportScheduler />
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.2rem', marginTop: '1.5rem' }}>
         <SummaryCard label="Total Issues" value={summary.total_issues ?? 0} color="#3b82f6"
           icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>} />
@@ -366,6 +387,7 @@ const Reports = () => {
           count={filteredTx.length} />
         <TabBtn label="Fine Reports" active={activeTab === 'fines'} onClick={() => setActiveTab('fines')}
           count={filteredFines.length} />
+        <TabBtn label="Enterprise AI & Automation" active={activeTab === 'ai_automation'} onClick={() => setActiveTab('ai_automation')} />
       </div>
 
       {/* ════════════════════════════════════════
@@ -373,6 +395,16 @@ const Reports = () => {
       ════════════════════════════════════════ */}
       {activeTab === 'overview' && (
         <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Calendar Heatmap Wrapper */}
+          {trend.length > 0 && (
+             <div className="chart-print-wrapper" style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
+               <BorrowActivityHeatmap trend={{
+                  labels: trend.map(t => t.period),
+                  issues: trend.map(t => t.issues),
+                  returns: trend.map(t => t.returns)
+               }} />
+             </div>
+          )}
           {/* Trend Chart */}
           <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.75rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -551,6 +583,7 @@ const Reports = () => {
       ════════════════════════════════════════ */}
       {activeTab === 'fines' && (
         <div style={{ marginTop: '1.5rem' }}>
+          <FinancialAnalytics summary={summary} />
           <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.75rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
             {/* Fine summary mini cards */}
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.75rem', flexWrap: 'wrap' }}>
