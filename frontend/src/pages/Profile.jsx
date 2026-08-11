@@ -11,7 +11,8 @@ import {
   updateUserRolePermissions,
   getAuditLogs
 } from '../services/api';
-import { Copy, Check } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Copy, Check, X, User, Mail, Key } from 'lucide-react';
 import { PageHeader } from '../components/layout/EnterpriseLibrary';
 import './Students.css';
 import './Dashboard.css';
@@ -714,75 +715,133 @@ const Profile = () => {
       )}
 
       {/* ── Modal: Add Employee ── */}
-      {showAddUserModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '2rem', width: '90%', maxWidth: '500px', border: '1px solid #D4A017' }}>
-            <h3 style={{ margin: '0 0 1.25rem 0', color: '#1e1b15' }}>Create Employee / Staff User</h3>
-            <form onSubmit={handleCreateEmployee}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-                <input required placeholder="Username (e.g. lib_staff1)" value={newUser.username} onChange={e => setNewUser({ ...newUser, username: e.target.value })} style={{ padding: '0.65rem', borderRadius: '8px', border: '1px solid #d1d5db' }} />
-                <input required type="email" placeholder="Email Address" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} style={{ padding: '0.65rem', borderRadius: '8px', border: '1px solid #d1d5db' }} />
-                <input required placeholder="Full Name" value={newUser.full_name} onChange={e => setNewUser({ ...newUser, full_name: e.target.value })} style={{ padding: '0.65rem', borderRadius: '8px', border: '1px solid #d1d5db' }} />
-                <input required type="password" placeholder="Initial Password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} style={{ padding: '0.65rem', borderRadius: '8px', border: '1px solid #d1d5db' }} />
-                <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} style={{ padding: '0.65rem', borderRadius: '8px', border: '1px solid #d1d5db' }}>
-                  <option value="librarian">Librarian</option>
-                  <option value="admin">System Admin</option>
-                </select>
+      {showAddUserModal && createPortal(
+        <div className="modal-overlay">
+          <div className="modal-container" style={{ width: '90%', maxWidth: '500px' }}>
+            <div className="modal-header">
+              <div className="modal-title">
+                <User size={24} style={{ color: '#D4A017' }} />
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#1e1b15' }}>Create Employee</h3>
+                  <span style={{ fontSize: '0.85rem', color: '#5c5549' }}>Add a new staff member or admin</span>
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                <button type="button" onClick={() => setShowAddUserModal(false)} style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff' }}>Cancel</button>
-                <button type="submit" style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: 'none', background: '#D4A017', color: '#fff', fontWeight: '700' }}>Create User</button>
-              </div>
-            </form>
+              <button className="modal-close" onClick={() => setShowAddUserModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleCreateEmployee}>
+                <div style={{ display: 'grid', gap: '1.25rem', marginBottom: '1.5rem' }}>
+                  <div className="premium-form-group">
+                    <label>Username *</label>
+                    <div className="premium-input-wrapper">
+                      <User className="premium-input-icon" size={16} />
+                      <input required placeholder="e.g. lib_staff1" value={newUser.username} onChange={e => setNewUser({ ...newUser, username: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="premium-form-group">
+                    <label>Email Address *</label>
+                    <div className="premium-input-wrapper">
+                      <Mail className="premium-input-icon" size={16} />
+                      <input required type="email" placeholder="Email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="premium-form-group">
+                    <label>Full Name *</label>
+                    <div className="premium-input-wrapper no-icon">
+                      <input required placeholder="Full Name" value={newUser.full_name} onChange={e => setNewUser({ ...newUser, full_name: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="premium-form-group">
+                    <label>Initial Password *</label>
+                    <div className="premium-input-wrapper">
+                      <Key className="premium-input-icon" size={16} />
+                      <input required type="password" placeholder="Password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="premium-form-group">
+                    <label>Role</label>
+                    <div className="premium-input-wrapper no-icon">
+                      <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })}>
+                        <option value="librarian">Librarian</option>
+                        <option value="admin">System Admin</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer" style={{ marginTop: '2rem' }}>
+                  <button type="button" className="btn-cancel" onClick={() => setShowAddUserModal(false)}>Cancel</button>
+                  <button type="submit" className="btn-submit" disabled={creatingUser}>{creatingUser ? 'Creating...' : 'Create User'}</button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Modal: Role & Permission Assignment ── */}
-      {selectedUserForPerms && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '2rem', width: '90%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #D4A017' }}>
-            <h3 style={{ margin: '0 0 0.5rem 0', color: '#1e1b15' }}>Assign Permissions — {selectedUserForPerms.username}</h3>
-            <p style={{ margin: '0 0 1.25rem 0', fontSize: '0.85rem', color: '#5c5549' }}>Configure RBAC role and custom granular capabilities</p>
-
-            <div style={{ marginBottom: '1.25rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '0.35rem' }}>ASSIGNED ROLE</label>
-              <select
-                value={selectedUserForPerms.role}
-                onChange={e => setSelectedUserForPerms({ ...selectedUserForPerms, role: e.target.value })}
-                style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #d1d5db' }}
-              >
-                <option value="admin">Admin (Full Access)</option>
-                <option value="librarian">Librarian</option>
-                <option value="member">Student / Member</option>
-              </select>
+      {selectedUserForPerms && createPortal(
+        <div className="modal-overlay">
+          <div className="modal-container" style={{ width: '90%', maxWidth: '600px' }}>
+            <div className="modal-header">
+              <div className="modal-title">
+                <Key size={24} style={{ color: '#D4A017' }} />
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#1e1b15' }}>Assign Permissions</h3>
+                  <span style={{ fontSize: '0.85rem', color: '#5c5549' }}>Configure RBAC for {selectedUserForPerms.username}</span>
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setSelectedUserForPerms(null)}>
+                <X size={20} />
+              </button>
             </div>
+            <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <div className="premium-form-group">
+                  <label>Assigned Role</label>
+                  <div className="premium-input-wrapper no-icon">
+                    <select
+                      value={selectedUserForPerms.role}
+                      onChange={e => setSelectedUserForPerms({ ...selectedUserForPerms, role: e.target.value })}
+                    >
+                      <option value="admin">Admin (Full Access)</option>
+                      <option value="librarian">Librarian</option>
+                      <option value="member">Student / Member</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
 
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '0.5rem' }}>GRANULAR PERMISSIONS</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                {permissionsCatalog.map(p => {
-                  const isChecked = (selectedUserForPerms.permissions || []).includes(p.code);
-                  return (
-                    <label key={p.code} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => handleTogglePermForUser(p.code)}
-                      />
-                      <span>{p.name} <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>({p.code})</span></span>
-                    </label>
-                  );
-                })}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', marginBottom: '0.8rem', color: '#1e1b15' }}>GRANULAR PERMISSIONS</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  {permissionsCatalog.map(p => {
+                    const isChecked = (selectedUserForPerms.permissions || []).includes(p.code);
+                    return (
+                      <label key={p.code} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer', padding: '0.5rem', background: isChecked ? 'rgba(212,160,23,0.05)' : 'transparent', borderRadius: '6px', border: isChecked ? '1px solid rgba(212,160,23,0.2)' : '1px solid transparent' }}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleTogglePermForUser(p.code)}
+                          style={{ accentColor: '#D4A017' }}
+                        />
+                        <span style={{ color: isChecked ? '#1e1b15' : '#5c5549', fontWeight: isChecked ? '600' : '400' }}>{p.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ marginTop: '2rem' }}>
+                <button type="button" className="btn-cancel" onClick={() => setSelectedUserForPerms(null)}>Cancel</button>
+                <button type="button" className="btn-submit" onClick={handleSaveUserRolePerms}>Save Permissions</button>
               </div>
             </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button type="button" onClick={() => setSelectedUserForPerms(null)} style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff' }}>Cancel</button>
-              <button type="button" onClick={handleSaveUserRolePerms} style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: 'none', background: '#D4A017', color: '#fff', fontWeight: '700' }}>Save Permissions</button>
-            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

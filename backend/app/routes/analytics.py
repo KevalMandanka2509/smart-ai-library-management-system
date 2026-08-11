@@ -34,7 +34,7 @@ def _date_key(dt, granularity: str) -> str:
 # 1. FULL DASHBOARD KPI SUMMARY
 # ─────────────────────────────────────────────
 @router.get("/dashboard")
-async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(get_current_user)):
+async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_permission("reports:view"))):
     now = datetime.utcnow()
     start_30 = now - timedelta(days=30)
     start_7 = now - timedelta(days=7)
@@ -404,7 +404,14 @@ class ScheduleRequest(BaseModel):
     email: str
 
 @router.post("/schedule")
-async def schedule_report(req: ScheduleRequest, db=Depends(get_db)):
+async def schedule_report(
+    req: ScheduleRequest, 
+    db=Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    role = current_user.get("role", "member")
+    if role not in ["admin", "librarian"]:
+        raise HTTPException(status_code=403, detail="Not authorized to schedule reports")
     db.scheduled_reports.insert_one({
         "frequency": req.frequency,
         "email": req.email,
@@ -416,7 +423,10 @@ class AIRequest(BaseModel):
     query: str
 
 @router.post("/ai")
-async def ai_assistant(req: AIRequest):
+async def ai_assistant(
+    req: AIRequest,
+    current_user=Depends(has_permission("reports:view"))
+):
     q = req.query.lower()
     if "return" in q or "clearance" in q:
         return {"action": "load_report", "type": "returns", "period": 30, "message": "Loading returns data"}

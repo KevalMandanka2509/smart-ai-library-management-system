@@ -89,69 +89,11 @@ const IconBell = () => (
 const Navbar = ({ isLoggedIn, userRole, onLogout, sidebarCollapsed, onToggleSidebar }) => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-
   const handleLogout = () => {
     localStorage.clear();
     if (onLogout) onLogout();
     navigate('/');
   };
-
-  const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
-  const [latestNotifs, setLatestNotifs] = useState([]);
-
-  const handleMarkDropdownRead = async (id, e) => {
-    e.stopPropagation();
-    try {
-      const token = localStorage.getItem('access_token');
-      await fetch(`http://localhost:8000/api/v1/notifications/read/${id}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      // Refresh local states
-      setLatestNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (_) { }
-  };
-
-  const handleMarkAllDropdownRead = async (e) => {
-    e.stopPropagation();
-    try {
-      const token = localStorage.getItem('access_token');
-      await fetch(`http://localhost:8000/api/v1/notifications/read-all`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setLatestNotifs(prev => prev.map(n => ({ ...n, read: true })));
-      setUnreadCount(0);
-    } catch (_) { }
-  };
-
-  // Poll for unread notifications every 30s when logged in
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    let cancelled = false;
-
-    const fetchUnread = async () => {
-      try {
-        const token = localStorage.getItem('access_token');
-        if (!token) return;
-        const res = await fetch('http://localhost:8000/api/v1/notifications/', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled) {
-          setUnreadCount(data.filter(n => !n.read).length);
-          setLatestNotifs(data.slice(0, 5));
-        }
-      } catch (_) { }
-    };
-
-    fetchUnread();
-    const interval = setInterval(fetchUnread, 120000); // 2 minutes
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [isLoggedIn]);
 
   // Logged-out Menu Links (Landing page navbar)
   const mainLinks = [
@@ -166,164 +108,6 @@ const Navbar = ({ isLoggedIn, userRole, onLogout, sidebarCollapsed, onToggleSide
   const isLibrarian = userRole === 'librarian';
 
   let sidebarLinks = [];
-
-  const bellIcon = (
-    <div style={{ position: 'relative' }}>
-      <button
-        onClick={(e) => {
-          e.preventDefault();
-          setNotifDropdownOpen(!notifDropdownOpen);
-        }}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          padding: 0,
-          cursor: 'pointer',
-          display: 'inline-flex',
-          alignItems: 'center',
-          color: 'inherit'
-        }}
-      >
-        <span style={{ position: 'relative', display: 'inline-flex' }}>
-          <IconBell />
-          {unreadCount > 0 && (
-            <span style={{
-              position: 'absolute', top: '-6px', right: '-8px',
-              background: '#e4a81e', color: '#fff', borderRadius: '50%',
-              width: '16px', height: '16px', fontSize: '10px',
-              fontWeight: 'bold', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', lineHeight: 1
-            }}>
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
-        </span>
-      </button>
-
-      {/* Popover Dropdown */}
-      {notifDropdownOpen && (
-        <div style={{
-          position: 'absolute',
-          bottom: '30px',
-          left: '0',
-          width: '280px',
-          background: '#ffffff',
-          border: '1px solid rgba(226,211,179,0.9)',
-          borderRadius: '12px',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-          zIndex: 10000,
-          padding: '0.75rem 0',
-          animation: 'notifFadeIn 0.2s ease-out'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '0 0.85rem 0.5rem 0.85rem',
-            borderBottom: '1px solid #f1f5f9',
-            marginBottom: '0.5rem'
-          }}>
-            <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0f172a' }}>Latest Updates</span>
-            {unreadCount > 0 && (
-              <button
-                onClick={handleMarkAllDropdownRead}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  color: '#d4a017',
-                  cursor: 'pointer',
-                  padding: 0
-                }}
-              >
-                Clear all
-              </button>
-            )}
-          </div>
-
-          <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-            {latestNotifs.length === 0 ? (
-              <div style={{ padding: '1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
-                No notifications
-              </div>
-            ) : (
-              latestNotifs.map(notif => (
-                <div
-                  key={notif.id}
-                  onClick={() => {
-                    setNotifDropdownOpen(false);
-                    navigate('/notifications');
-                  }}
-                  style={{
-                    padding: '0.6rem 0.85rem',
-                    borderBottom: '1px solid #f8fafc',
-                    cursor: 'pointer',
-                    background: notif.read ? 'transparent' : '#fffbeb',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.15rem',
-                    transition: 'background 0.15s'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#fefce8'}
-                  onMouseLeave={e => e.currentTarget.style.background = notif.read ? 'transparent' : '#fffbeb'}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#1e293b' }}>{notif.title}</span>
-                    {!notif.read && (
-                      <button
-                        onClick={(e) => handleMarkDropdownRead(notif.id, e)}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#d4a017',
-                          fontSize: '0.75rem',
-                          cursor: 'pointer',
-                          padding: '0 2px'
-                        }}
-                        title="Mark Read"
-                      >
-                        ✓
-                      </button>
-                    )}
-                  </div>
-                  <span style={{
-                    fontSize: '0.75rem',
-                    color: '#64748b',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    {notif.message}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div style={{
-            padding: '0.5rem 0.85rem 0 0.85rem',
-            borderTop: '1px solid #f1f5f9',
-            marginTop: '0.5rem',
-            textAlign: 'center'
-          }}>
-            <Link
-              to="/notifications"
-              onClick={() => setNotifDropdownOpen(false)}
-              style={{
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                color: '#b8860b',
-                textDecoration: 'none'
-              }}
-            >
-              View all notification logs
-            </Link>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 
   if (isAdmin) {
     sidebarLinks = [
@@ -344,7 +128,7 @@ const Navbar = ({ isLoggedIn, userRole, onLogout, sidebarCollapsed, onToggleSide
       { to: '/email-automation', label: 'Email Automation', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg> },
       { to: '/sms-automation', label: 'SMS Automation', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg> },
       { to: '/recycle-bin', label: 'Recycle Bin', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> },
-      { to: '/notifications', label: 'Notifications', icon: bellIcon },
+      { to: '/notifications', label: 'Notifications', icon: <IconBell /> },
       { to: '/settings', label: 'Settings', icon: <IconSettings /> },
     ];
   } else if (isLibrarian) {
@@ -360,7 +144,7 @@ const Navbar = ({ isLoggedIn, userRole, onLogout, sidebarCollapsed, onToggleSide
       { to: '/transactions', label: 'Transactions', icon: <IconTransactions /> },
       { to: '/reports', label: 'Reports', icon: <IconReports /> },
       { to: '/contact-messages', label: 'Contact Messages', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg> },
-      { to: '/notifications', label: 'Notifications', icon: bellIcon },
+      { to: '/notifications', label: 'Notifications', icon: <IconBell /> },
       { to: '/profile', label: 'Profile', icon: <IconProfile /> },
     ];
   } else {
@@ -372,7 +156,7 @@ const Navbar = ({ isLoggedIn, userRole, onLogout, sidebarCollapsed, onToggleSide
       { to: '/issued-books', label: 'Issued Books', icon: <IconIssueReturn /> },
       { to: '/reservations', label: 'Reservations', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> },
       { to: '/fines', label: 'My Fines', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg> },
-      { to: '/notifications', label: 'Notifications', icon: bellIcon },
+      { to: '/notifications', label: 'Notifications', icon: <IconBell /> },
       { to: '/profile', label: 'Profile', icon: <IconProfile /> },
       { to: '/settings', label: 'Settings', icon: <IconSettings /> },
     ];

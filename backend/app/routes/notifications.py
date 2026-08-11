@@ -193,22 +193,3 @@ async def create_system_notification(
             db.notifications.insert_many(new_notifs)
 
     return {"message": "Notification dispatched successfully."}
-
-# ============================================
-# 4. NOTIFICATION SETTINGS
-# ============================================
-@router.get("/settings", response_model=dict)
-async def get_notification_settings(db=Depends(get_db), current_user=Depends(get_current_user)):
-    # Mock settings response for user
-    return {
-        "email_alerts": True,
-        "sms_alerts": False,
-        "browser_alerts": True,
-        "notify_borrows": True,
-        "notify_fines": True,
-        "notify_reservations": True
-    }
-
-@router.post("/settings", response_model=dict)
-async def update_notification_settings(payload: dict, db=Depends(get_db), current_user=Depends(get_current_user)):
-    return {"message": "Settings updated successfully"}

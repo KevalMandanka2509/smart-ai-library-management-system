@@ -1,5 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { createBook, updateBook, getBarcodeImageUrl, getQrImageUrl, validateCode } from '../../services/api';
+import { 
+  createBook, 
+  updateBook, 
+  getBarcodeImageUrl, 
+  getQrImageUrl, 
+  validateCode 
+} from '../../services/api';
+import { 
+  BookOpen, 
+  User, 
+  Hash, 
+  Bookmark, 
+  Calendar, 
+  Compass, 
+  FileText, 
+  MapPin, 
+  DollarSign, 
+  UploadCloud, 
+  X 
+} from 'lucide-react';
 
 const BookForm = ({ book, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -87,6 +106,16 @@ const BookForm = ({ book, onSave, onCancel }) => {
     } catch (_) {}
   };
 
+  const handleFileChange = (file) => {
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, cover_image: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const validate = () => {
     if (!formData.title.trim()) { setError('Title required'); return false; }
     if (!formData.author.trim()) { setError('Author required'); return false; }
@@ -123,7 +152,7 @@ const BookForm = ({ book, onSave, onCancel }) => {
           });
         }
       }
-      if (onSave) setTimeout(onSave, 1500);
+      if (onSave) setTimeout(onSave, 1200);
     } catch (err) {
       setError(err.response?.data?.detail || 'Save failed');
     } finally {
@@ -135,103 +164,189 @@ const BookForm = ({ book, onSave, onCancel }) => {
   const currentQr = formData.qr_value || (currentBarcode ? `QR-${currentBarcode}` : '');
 
   return (
-    <div className="book-form">
-      <h2>{book?.id ? '✏️ Edit Book' : '➕ Add Book'}</h2>
-      
-      <form onSubmit={handleSubmit}>
-        {error && <div className="error">{error}<button type="button" onClick={() => setError('')}>✕</button></div>}
-        {success && <div className="success">✅ {success}</div>}
-        {codeWarning && <div className="error" style={{ background: '#fffbe5', color: '#b45309', border: '1px solid #fde68a' }}>⚠️ {codeWarning}</div>}
-        
-        <div className="form-grid">
+    <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
+      {/* Modal Header */}
+      <div className="modal-header">
+        <div className="modal-title-area">
+          <div className="modal-icon-wrapper">
+            <BookOpen size={24} />
+          </div>
           <div>
-            <div className="form-group">
-              <label>Title *</label>
-              <input type="text" name="title" value={formData.title} onChange={handleChange} required />
+            <h2>{book?.id || book?._id ? 'Edit Book Details' : 'Add New Book'}</h2>
+            <div className="modal-subtitle">
+              {book?.id || book?._id ? 'Modify the catalog entry information' : 'Register a new library catalog asset'}
             </div>
-            
-            <div className="form-group">
-              <label>Author *</label>
-              <input type="text" name="author" value={formData.author} onChange={handleChange} required />
-            </div>
-            
-            <div className="form-group">
-              <label>ISBN *</label>
-              <input type="text" name="isbn" value={formData.isbn} onChange={handleChange} required />
-            </div>
-            
-            <div className="form-group">
-              <label>Publisher</label>
-              <input type="text" name="publisher" value={formData.publisher} onChange={handleChange} />
-            </div>
-            
-            <div className="form-group">
-              <label>Publication Year</label>
-              <input type="number" name="publication_year" value={formData.publication_year} onChange={handleChange} />
-            </div>
+          </div>
+        </div>
+        <button type="button" className="modal-close-btn" onClick={onCancel}>
+          <X size={20} />
+        </button>
+      </div>
 
-            <div className="form-group">
-              <label>Barcode Value (Auto-Generated)</label>
-              <input type="text" name="barcode_value" value={formData.barcode_value} onChange={handleChange} onBlur={handleValidateBarcode} placeholder="e.g. LIB-9780123456" />
+      {/* Modal Body */}
+      <div className="modal-body">
+        {error && <div className="error" style={{ marginBottom: '1rem', padding: '0.75rem 1.25rem' }}>{error}</div>}
+        {success && <div className="success" style={{ marginBottom: '1rem', padding: '0.75rem 1.25rem' }}>✅ {success}</div>}
+        {codeWarning && <div className="error" style={{ marginBottom: '1rem', padding: '0.75rem 1.25rem', background: '#fffbe5', color: '#b45309', border: '1px solid #fde68a' }}>⚠️ {codeWarning}</div>}
+        
+        <div className="premium-form-grid">
+          {/* Column 1: Core Identification */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div className="premium-form-group">
+              <label>Title *</label>
+              <div className="premium-input-wrapper">
+                <BookOpen className="premium-input-icon" size={16} />
+                <input type="text" name="title" value={formData.title} onChange={handleChange} required placeholder="e.g. The Great Gatsby" />
+              </div>
+            </div>
+            
+            <div className="premium-form-group">
+              <label>Author *</label>
+              <div className="premium-input-wrapper">
+                <User className="premium-input-icon" size={16} />
+                <input type="text" name="author" value={formData.author} onChange={handleChange} required placeholder="e.g. F. Scott Fitzgerald" />
+              </div>
+            </div>
+            
+            <div className="premium-form-group">
+              <label>ISBN *</label>
+              <div className="premium-input-wrapper">
+                <Hash className="premium-input-icon" size={16} />
+                <input type="text" name="isbn" value={formData.isbn} onChange={handleChange} required placeholder="e.g. 9780743273565" />
+              </div>
+            </div>
+            
+            <div className="premium-form-group">
+              <label>Publisher</label>
+              <div className="premium-input-wrapper">
+                <Bookmark className="premium-input-icon" size={16} />
+                <input type="text" name="publisher" value={formData.publisher} onChange={handleChange} placeholder="e.g. Scribner" />
+              </div>
             </div>
           </div>
           
-          <div>
-            <div className="form-group">
+          {/* Column 2: Meta & Stock */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div className="premium-form-group">
+              <label>Publication Year</label>
+              <div className="premium-input-wrapper">
+                <Calendar className="premium-input-icon" size={16} />
+                <input type="number" name="publication_year" value={formData.publication_year} onChange={handleChange} placeholder="e.g. 1925" />
+              </div>
+            </div>
+
+            <div className="premium-form-group">
               <label>Genre</label>
-              <input type="text" name="genre" value={formData.genre} onChange={handleChange} />
+              <div className="premium-input-wrapper">
+                <Compass className="premium-input-icon" size={16} />
+                <input type="text" name="genre" value={formData.genre} onChange={handleChange} placeholder="e.g. Classic Fiction" />
+              </div>
             </div>
             
-            <div className="form-group">
+            <div className="premium-form-group">
               <label>Total Copies *</label>
-              <input type="number" name="total_copies" value={formData.total_copies} onChange={handleChange} min="1" required />
+              <div className="premium-input-wrapper">
+                <FileText className="premium-input-icon" size={16} />
+                <input type="number" name="total_copies" value={formData.total_copies} onChange={handleChange} min="1" required />
+              </div>
             </div>
             
-            <div className="form-group">
+            <div className="premium-form-group">
               <label>Available Copies *</label>
-              <input type="number" name="available_copies" value={formData.available_copies} onChange={handleChange} min="0" required />
+              <div className="premium-input-wrapper">
+                <FileText className="premium-input-icon" size={16} />
+                <input type="number" name="available_copies" value={formData.available_copies} onChange={handleChange} min="0" required />
+              </div>
             </div>
-            
-            <div className="form-group">
+          </div>
+
+          {/* Column 3: Logistics & Identifiers */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div className="premium-form-group">
               <label>Location</label>
-              <input type="text" name="location" value={formData.location} onChange={handleChange} />
+              <div className="premium-input-wrapper">
+                <MapPin className="premium-input-icon" size={16} />
+                <input type="text" name="location" value={formData.location} onChange={handleChange} placeholder="e.g. Shelf A-3" />
+              </div>
             </div>
             
-            <div className="form-group">
+            <div className="premium-form-group">
               <label>Price (₹)</label>
-              <input type="number" name="price" value={formData.price} onChange={handleChange} step="0.01" />
+              <div className="premium-input-wrapper">
+                <DollarSign className="premium-input-icon" size={16} />
+                <input type="number" name="price" value={formData.price} onChange={handleChange} step="0.01" />
+              </div>
             </div>
 
-            <div className="form-group">
-              <label>QR Code Value (Auto-Generated)</label>
-              <input type="text" name="qr_value" value={formData.qr_value} onChange={handleChange} onBlur={handleValidateQr} placeholder="e.g. QR-LIB-9780123456" />
+            <div className="premium-form-group">
+              <label>Barcode Value (Auto-Gen)</label>
+              <div className="premium-input-wrapper">
+                <Hash className="premium-input-icon" size={16} />
+                <input type="text" name="barcode_value" value={formData.barcode_value} onChange={handleChange} onBlur={handleValidateBarcode} placeholder="e.g. LIB-9780123456" />
+              </div>
+            </div>
+
+            <div className="premium-form-group">
+              <label>QR Code Value (Auto-Gen)</label>
+              <div className="premium-input-wrapper">
+                <Hash className="premium-input-icon" size={16} />
+                <input type="text" name="qr_value" value={formData.qr_value} onChange={handleChange} onBlur={handleValidateQr} placeholder="e.g. QR-LIB-9780123456" />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Live Barcode & QR Code Preview */}
-        {currentBarcode && (
-          <div style={{ marginTop: '1.25rem', padding: '1rem', background: '#f8fafc', borderRadius: '10px', border: '1px dashed #cbd5e1', display: 'flex', gap: '1.5rem', alignItems: 'center', justifyContent: 'space-around' }}>
-            <div style={{ textAlign: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.25rem' }}>BARCODE PREVIEW</span>
-              <img src={getBarcodeImageUrl(currentBarcode)} alt="Barcode Preview" style={{ maxHeight: '48px', background: '#fff', padding: '4px', borderRadius: '4px', border: '1px solid #e2e8f0' }} />
-              <span style={{ display: 'block', fontSize: '0.75rem', fontFamily: 'monospace', color: '#334155' }}>{currentBarcode}</span>
-            </div>
-
-            <div style={{ textAlign: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.25rem' }}>QR CODE PREVIEW</span>
-              <img src={getQrImageUrl(currentQr)} alt="QR Preview" style={{ maxHeight: '60px', background: '#fff', padding: '4px', borderRadius: '4px', border: '1px solid #e2e8f0' }} />
-              <span style={{ display: 'block', fontSize: '0.75rem', fontFamily: 'monospace', color: '#334155' }}>{currentQr}</span>
-            </div>
+        {/* Lower Row: Cover Image Upload & Barcode/QR Previews side-by-side to save space */}
+        <div className="modal-lower-row">
+          {/* Cover Image Upload Area */}
+          <div className="premium-form-group">
+            <label>Book Cover Image</label>
+            {!formData.cover_image ? (
+              <label className="drag-drop-zone" style={{ padding: '1rem', minHeight: '100px' }} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); handleFileChange(e.dataTransfer.files?.[0]); }}>
+                <UploadCloud size={24} color="var(--gold)" />
+                <div style={{ fontSize: '0.85rem' }}><strong>Drag & drop</strong> or click to upload cover</div>
+                <input type="file" accept="image/*" onChange={e => handleFileChange(e.target.files?.[0])} style={{ display: 'none' }} />
+              </label>
+            ) : (
+              <div className="drag-drop-preview-container" style={{ padding: '0.5rem 1rem', marginTop: 0 }}>
+                <img src={formData.cover_image} alt="Book cover preview" className="drag-drop-preview-img" style={{ width: '45px', height: '60px' }} />
+                <div className="drag-drop-preview-info">
+                  <div className="drag-drop-preview-title" style={{ fontSize: '0.8rem' }}>{formData.title || 'Untitled Book'} Cover</div>
+                  <button type="button" className="drag-drop-preview-remove" style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }} onClick={() => setFormData(prev => ({ ...prev, cover_image: '' }))}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-        
-        <div className="form-actions" style={{ marginTop: '1.5rem' }}>
-          <button type="submit" disabled={loading}>{loading ? 'Saving...' : '💾 Save'}</button>
-          {onCancel && <button type="button" onClick={onCancel}>Cancel</button>}
+
+          {/* Barcode & QR Previews */}
+          {currentBarcode && (
+            <div style={{ padding: '0.75rem 1rem', background: '#fffdf9', borderRadius: '16px', border: '1px dashed rgba(212,160,23,0.3)', display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-around', height: '100%' }}>
+              <div style={{ textAlign: 'center' }}>
+                <img src={getBarcodeImageUrl(currentBarcode)} alt="Barcode" style={{ maxHeight: '36px', background: '#fff', padding: '2px', borderRadius: '6px', border: '1px solid #e2e8f0' }} />
+                <span style={{ display: 'block', fontSize: '0.65rem', fontFamily: 'monospace', color: '#334155', marginTop: '2px' }}>{currentBarcode}</span>
+              </div>
+
+              <div style={{ textAlign: 'center' }}>
+                <img src={getQrImageUrl(currentQr)} alt="QR" style={{ maxHeight: '42px', background: '#fff', padding: '2px', borderRadius: '6px', border: '1px solid #e2e8f0' }} />
+                <span style={{ display: 'block', fontSize: '0.65rem', fontFamily: 'monospace', color: '#334155', marginTop: '2px' }}>{currentQr}</span>
+              </div>
+            </div>
+          )}
         </div>
-      </form>
-    </div>
+      </div>
+
+      {/* Modal Footer */}
+      <div className="modal-footer">
+        <button type="button" className="modal-btn modal-btn-cancel" onClick={onCancel}>
+          Cancel
+        </button>
+        <button type="submit" className="modal-btn modal-btn-save" disabled={loading}>
+          {loading ? 'Saving...' : 'Save Book'}
+        </button>
+      </div>
+    </form>
   );
 };
 

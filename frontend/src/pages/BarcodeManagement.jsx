@@ -270,3 +270,4 @@ const BarcodeManagement = () => {
 };
 
 export default BarcodeManagement;
+

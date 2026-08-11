@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import Navbar from './components/layout/Navbar';
 import TopNavbar from './components/layout/TopNavbar';
 import Footer from './components/layout/Footer';
+import { getMyProfile } from './services/api';
 import './App.css';
 
 // Global Error Boundary Component
@@ -163,6 +164,34 @@ const App = () => {
       }
     };
     window.addEventListener('storage', handleStorageChange);
+    
+    // Verify actual role with backend to prevent local manipulation
+    const verifyRole = async () => {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        try {
+          const profile = await getMyProfile();
+          if (profile && profile.role) {
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+              const userData = JSON.parse(userStr);
+              if (userData.role !== profile.role) {
+                userData.role = profile.role;
+                localStorage.setItem('user', JSON.stringify(userData));
+                setUserRole(profile.role);
+              }
+            }
+          }
+        } catch (error) {
+          // If 401/403, we might want to log out, but api interceptor handles 401.
+          if (error.response?.status === 403) {
+             // Role error or banned
+          }
+        }
+      }
+    };
+    verifyRole();
+
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
@@ -207,7 +236,7 @@ const App = () => {
             {/* Protected Dashboard and Configuration routes (both admin and user can access) */}
             <Route element={<ProtectedLayout isLoggedIn={isLoggedIn} userRole={userRole} handleLogout={handleLogout} />}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/settings" element={<RoleGuard roles={['admin', 'librarian']}><Settings /></RoleGuard>} />
+              <Route path="/settings" element={<RoleGuard userRole={userRole} allowedRoles={['admin', 'librarian', 'member']}><Settings /></RoleGuard>} />
               <Route path="/recycle-bin" element={<RecycleBin />} />
 
               {/* Shared routes: both admin and members can browse book catalogue and view profile */}

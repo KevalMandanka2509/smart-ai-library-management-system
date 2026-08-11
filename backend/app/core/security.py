@@ -135,13 +135,20 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token payload"
         )
+
+    if payload.get("type") != "access":
+        Security.audit_log("USER_AUTHENTICATION", "INVALID_TOKEN_TYPE", "anonymous", client_ip)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token type"
+        )
     
     db = get_db()
     collection = db.users
     # Projection: only fetch fields needed by route handlers
     user_proj = {
         "_id": 1, "username": 1, "email": 1, "role": 1,
-        "full_name": 1, "is_active": 1, "permissions": 1
+        "full_name": 1, "is_active": 1, "permissions": 1, "locked_until": 1
     }
     user = None
     if ObjectId.is_valid(user_id):
@@ -163,6 +170,13 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is inactive or disabled"
+        )
+        
+    if user.get("locked_until") and user["locked_until"] > datetime.utcnow():
+        Security.audit_log("USER_AUTHENTICATION", "ACCOUNT_LOCKED", str(user_id), client_ip)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is temporarily locked"
         )
         
     return user

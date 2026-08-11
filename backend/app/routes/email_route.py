@@ -6,6 +6,7 @@ from datetime import datetime
 from ..database import get_db
 from ..core.security import get_current_admin
 from ..services.email_service import EmailService
+import asyncio
 
 router = APIRouter(prefix="/api/v1/email", tags=["Email Service"])
 
@@ -93,8 +94,10 @@ async def trigger_due_reminders(
     students_cursor = db.students.find({"student_id": {"$in": student_ids}})
     students_map = {s["student_id"]: s for s in students_cursor}
 
-    dispatched_count = 0
-    for borrow in active_borrows:
+    import asyncio
+    semaphore = asyncio.Semaphore(10)
+    
+    async def process_borrow(borrow):
         student_id = borrow.get("student_id")
         student = students_map.get(student_id) if student_id else None
         student_email = student.get("email") if student else None
@@ -109,16 +112,24 @@ async def trigger_due_reminders(
             student_name = borrow.get("student_name") or (student.get("full_name") if student else "Student")
             book_title = borrow.get("book_title", "Borrowed Book")
 
-            # Non-blocking async call
-            await EmailService.send_due_reminder(
-                recipient_email=student_email,
-                student_name=student_name,
-                book_title=book_title,
-                due_date=due_str,
-                days_overdue=days_overdue,
-                db=db
-            )
-            dispatched_count += 1
+            async with semaphore:
+                try:
+                    await EmailService.send_due_reminder(
+                        recipient_email=student_email,
+                        student_name=student_name,
+                        book_title=book_title,
+                        due_date=due_str,
+                        days_overdue=days_overdue,
+                        db=db
+                    )
+                    return 1
+                except Exception:
+                    pass
+        return 0
+
+    tasks = [process_borrow(b) for b in active_borrows]
+    results = await asyncio.gather(*tasks)
+    dispatched_count = sum(results)
 
     return {
         "message": f"Dispatched {dispatched_count} due/overdue reminders to active borrowers."
@@ -177,17 +188,29 @@ async def resend_email(
         raise HTTPException(status_code=404, detail="Email log record not found")
 
     recipient = log_entry.get("recipient_email")
-    subject = log_entry.get("subject", "Resent Notification")
-    body = log_entry.get("body", "")
     template_name = log_entry.get("template_name", "resend")
+    template_args = log_entry.get("template_args", {})
 
-    success = await EmailService.send_email_async(
-        recipient_email=recipient,
-        subject=subject,
-        html_body=body,
-        template_name=template_name,
-        db=db
-    )
+    success = False
+    if template_name == "issue_confirmation":
+        success = await EmailService.send_issue_confirmation(recipient, **template_args, db=db)
+    elif template_name == "return_confirmation":
+        success = await EmailService.send_return_confirmation(recipient, **template_args, db=db)
+    elif template_name == "due_reminder":
+        success = await EmailService.send_due_reminder(recipient, **template_args, db=db)
+    elif template_name == "fine_notice":
+        success = await EmailService.send_fine_reminder(recipient, **template_args, db=db)
+    elif template_name == "reservation_update":
+        success = await EmailService.send_reservation_notification(recipient, **template_args, db=db)
+    elif template_name == "welcome_email":
+        success = await EmailService.send_welcome_email(recipient, **template_args, db=db)
+    elif template_name == "custom_admin":
+        success = await EmailService.send_custom_email(recipient, **template_args, db=db)
+    elif template_name == "smtp_test":
+        success = await EmailService.send_test_email(recipient, db=db)
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported template for resend")
+
     return {
         "success": success,
         "message": f"Resent email to {recipient} ({'Success' if success else 'Failed'})"
@@ -207,10 +230,18 @@ async def send_custom_announcement(
         members = list(db.users.find({"role": "member"}, {"email": 1, "full_name": 1}))
         students = list(db.students.find({}, {"email": 1, "full_name": 1}))
         emails = set([m["email"] for m in members if m.get("email")] + [s["email"] for s in students if s.get("email")])
-        count = 0
-        for em in emails:
-            await EmailService.send_custom_email(em, payload.subject, payload.message, db=db)
-            count += 1
+        import asyncio
+        semaphore = asyncio.Semaphore(10)
+        async def send_to_email(em):
+            async with semaphore:
+                try:
+                    await EmailService.send_custom_email(em, payload.subject, payload.message, db=db)
+                    return 1
+                except Exception:
+                    return 0
+        tasks = [send_to_email(em) for em in emails]
+        results = await asyncio.gather(*tasks)
+        count = sum(results)
         return {"success": True, "message": f"Broadcast email dispatched to {count} library members!"}
     
     if not payload.recipient_email:

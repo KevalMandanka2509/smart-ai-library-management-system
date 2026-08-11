@@ -18,24 +18,24 @@ router = APIRouter(prefix="/api/v1/books", tags=["Books"])
 async def create_book(book: BookCreate, db=Depends(get_db), current_user=Depends(has_permission("books:write"))):
     """
     Add a new book to the library.
-    - Checks if ISBN already exists
     - Creates new book entry
     """
     collection = db.books
-    
-    # Check if book with same ISBN exists
-    existing_book = collection.find_one({"isbn": book.isbn})
-    if existing_book:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Book with ISBN {book.isbn} already exists"
-        )
     
     # Create new book document
     new_book = book_document(book.dict())
     
     # Insert into MongoDB
-    result = collection.insert_one(new_book)
+    from pymongo.errors import DuplicateKeyError
+    try:
+        result = collection.insert_one(new_book)
+    except DuplicateKeyError as e:
+        error_msg = str(e)
+        field = "ISBN" if "isbn" in error_msg else "Barcode/QR"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Book with this {field} already exists"
+        )
     
     # Get inserted book
     inserted_book = collection.find_one({"_id": result.inserted_id})
@@ -126,16 +126,7 @@ async def update_book(
             detail=f"Book with ID {book_id} not found"
         )
     
-    # Check ISBN uniqueness if being updated
     update_data = book_update.dict(exclude_unset=True)
-    
-    if "isbn" in update_data and update_data["isbn"] != book.get("isbn"):
-        existing_book = collection.find_one({"isbn": update_data["isbn"]})
-        if existing_book:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Book with ISBN {update_data['isbn']} already exists"
-            )
     
     # Update available status
     if "available_copies" in update_data:
@@ -145,12 +136,22 @@ async def update_book(
     update_data["updated_at"] = datetime.utcnow()
     
     from pymongo import ReturnDocument
+    from pymongo.errors import DuplicateKeyError
+    
     # Update in MongoDB and return updated document
-    updated_book = collection.find_one_and_update(
-        {"_id": ObjectId(book_id)},
-        {"$set": update_data},
-        return_document=ReturnDocument.AFTER
-    )
+    try:
+        updated_book = collection.find_one_and_update(
+            {"_id": ObjectId(book_id)},
+            {"$set": update_data},
+            return_document=ReturnDocument.AFTER
+        )
+    except DuplicateKeyError as e:
+        error_msg = str(e)
+        field = "ISBN" if "isbn" in error_msg else "Barcode/QR"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Book with this {field} already exists"
+        )
     
     if not updated_book:
         raise HTTPException(
@@ -192,7 +193,7 @@ async def delete_book(book_id: str, db=Depends(get_db), current_user=Depends(has
             detail=f"Cannot delete book. There are {active_borrows} active borrow(s) for this book."
         )
         
-    active_reservations = db.reservations.count_documents({"book_id": book_id, "status": "active"})
+    active_reservations = db.reservations.count_documents({"book_id": book_id, "status": {"$in": ["pending", "ready"]}})
     if active_reservations > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -435,6 +436,23 @@ async def bulk_delete_books(
         object_ids.append(ObjectId(bid))
 
     result = books = list(db.books.find({"_id": {"$in": object_ids}}))
+    
+    # Safe delete checks for bulk
+    for book in books:
+        book_id_str = str(book["_id"])
+        active_borrows = db.borrows.count_documents({"book_id": book_id_str, "status": "issued"})
+        if active_borrows > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete book {book.get('title')}. It has active borrow(s)."
+            )
+        active_reservations = db.reservations.count_documents({"book_id": book_id_str, "status": {"$in": ["pending", "ready"]}})
+        if active_reservations > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot delete book {book.get('title')}. It has active reservation(s)."
+            )
+
     if books:
         recycle_docs = [{"original_collection": "books", "record": b, "deleted_at": datetime.utcnow(), "deleted_by": current_user.get("username", "admin"), "display_name": b.get("title", "Unknown Book")} for b in books]
         db.recycle_bin.insert_many(recycle_docs)

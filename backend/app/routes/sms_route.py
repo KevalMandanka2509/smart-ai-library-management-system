@@ -6,6 +6,7 @@ from datetime import datetime
 from ..database import get_db
 from ..core.security import get_current_admin
 from ..services.sms_service import SmsService
+import asyncio
 
 router = APIRouter(prefix="/api/v1/sms", tags=["SMS Service"])
 
@@ -110,8 +111,10 @@ async def trigger_due_reminders(
     students_cursor = db.students.find({"student_id": {"$in": student_ids}})
     students_map = {s["student_id"]: s for s in students_cursor}
 
-    dispatched_count = 0
-    for borrow in active_borrows:
+    import asyncio
+    semaphore = asyncio.Semaphore(10)
+
+    async def process_borrow(borrow):
         student_id = borrow.get("student_id")
         student = students_map.get(student_id) if student_id else None
         phone = student.get("phone") if student else None
@@ -126,15 +129,24 @@ async def trigger_due_reminders(
             student_name = borrow.get("student_name") or (student.get("full_name") if student else "Student")
             book_title = borrow.get("book_title", "Borrowed Book")
 
-            await SmsService.send_due_reminder(
-                phone=phone,
-                student_name=student_name,
-                book_title=book_title,
-                due_date=due_str,
-                days_overdue=days_overdue,
-                db=db
-            )
-            dispatched_count += 1
+            async with semaphore:
+                try:
+                    await SmsService.send_due_reminder(
+                        phone=phone,
+                        student_name=student_name,
+                        book_title=book_title,
+                        due_date=due_str,
+                        days_overdue=days_overdue,
+                        db=db
+                    )
+                    return 1
+                except Exception:
+                    pass
+        return 0
+    
+    tasks = [process_borrow(b) for b in active_borrows]
+    results = await asyncio.gather(*tasks)
+    dispatched_count = sum(results)
 
     return {
         "message": f"Dispatched {dispatched_count} SMS reminders to active borrowers."
@@ -183,15 +195,27 @@ async def resend_sms(
         raise HTTPException(status_code=404, detail="SMS log record not found")
 
     phone = log_entry.get("recipient_phone")
-    message = log_entry.get("message", "")
     template_name = log_entry.get("template_name", "resend")
+    template_args = log_entry.get("template_args", {})
 
-    success = await SmsService.send_sms_async(
-        phone=phone,
-        message=message,
-        template_name=template_name,
-        db=db
-    )
+    success = False
+    if template_name == "issue_confirmation":
+        success = await SmsService.send_issue_confirmation(phone, **template_args, db=db)
+    elif template_name == "return_confirmation":
+        success = await SmsService.send_return_confirmation(phone, **template_args, db=db)
+    elif template_name == "due_reminder":
+        success = await SmsService.send_due_reminder(phone, **template_args, db=db)
+    elif template_name == "fine_notice":
+        success = await SmsService.send_fine_reminder(phone, **template_args, db=db)
+    elif template_name == "reservation_update":
+        success = await SmsService.send_reservation_notification(phone, **template_args, db=db)
+    elif template_name == "welcome_sms":
+        success = await SmsService.send_welcome_sms(phone, **template_args, db=db)
+    elif template_name == "custom_admin":
+        success = await SmsService.send_custom_sms(phone, **template_args, db=db)
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported template for resend")
+
     return {
         "success": success,
         "message": f"Resent SMS to {phone} ({'Success' if success else 'Failed'})"
@@ -212,10 +236,18 @@ async def send_custom_sms(
         members = list(db.users.find({"role": "member"}, {"phone": 1}))
         students = list(db.students.find({}, {"phone": 1}))
         phones = set([m["phone"] for m in members if m.get("phone")] + [s["phone"] for s in students if s.get("phone")])
-        count = 0
-        for ph in phones:
-            await SmsService.send_custom_sms(ph, payload.message, db=db)
-            count += 1
+        import asyncio
+        semaphore = asyncio.Semaphore(10)
+        async def send_to_phone(ph):
+            async with semaphore:
+                try:
+                    await SmsService.send_custom_sms(ph, payload.message, db=db)
+                    return 1
+                except Exception:
+                    return 0
+        tasks = [send_to_phone(ph) for ph in phones]
+        results = await asyncio.gather(*tasks)
+        count = sum(results)
         return {"success": True, "message": f"Broadcast SMS dispatched to {count} library members!"}
 
     if not payload.recipient_phone:

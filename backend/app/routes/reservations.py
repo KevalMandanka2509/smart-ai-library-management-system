@@ -30,12 +30,25 @@ async def reserve_book(request: ReservationRequest, db=Depends(get_db), current_
     is_admin = current_user.get("role") == "admin"
     student_id = request.student_id if (is_admin and request.student_id) else current_user.get("username")
     
-    # 2. Get student details
+    # 2. Get student details and verify active
     student = db.students.find_one({"student_id": student_id})
     if not student:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Student record '{student_id}' not found"
+        )
+    if not student.get("is_active", True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Student account is disabled"
+        )
+
+    # 2b. Check for unpaid fines
+    unpaid_fine = db.fines.find_one({"student_id": student_id, "paid": False})
+    if unpaid_fine:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Student has unpaid fines. Please clear them before placing a reservation."
         )
         
     # 3. Find book
@@ -73,27 +86,31 @@ async def reserve_book(request: ReservationRequest, db=Depends(get_db), current_
             detail="You currently have this book issued. Cannot reserve."
         )
 
-    existing_res = db.reservations.find_one({
-        "student_id": student_id,
-        "book_id": str(book["_id"]),
-        "status": {"$in": ["pending", "ready"]}
-    })
-    if existing_res:
+    # 6. Atomically create reservation only if no active one exists
+    from pymongo import ReturnDocument
+    result = db.reservations.update_one(
+        {
+            "student_id": student_id,
+            "book_id": str(book["_id"]),
+            "status": {"$in": ["pending", "ready"]}
+        },
+        {
+            "$setOnInsert": {
+                "student_id": student_id,
+                "student_name": student["full_name"],
+                "book_id": str(book["_id"]),
+                "book_title": book["title"],
+                "reserved_at": datetime.utcnow(),
+                "status": "pending"
+            }
+        },
+        upsert=True
+    )
+    if result.matched_count > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You already have an active reservation for this book."
         )
-
-    # 6. Create reservation document
-    new_res = {
-        "student_id": student_id,
-        "student_name": student["full_name"],
-        "book_id": str(book["_id"]),
-        "book_title": book["title"],
-        "reserved_at": datetime.utcnow(),
-        "status": "pending"
-    }
-    db.reservations.insert_one(new_res)
     
     # 7. Trigger notification
     from ..utils.notification_helper import create_notification
@@ -138,26 +155,26 @@ async def cancel_reservation(id: str, db=Depends(get_db), current_user=Depends(g
     if not is_admin and res["student_id"] != current_user.get("username"):
         raise HTTPException(status_code=403, detail="Not authorized to cancel this reservation")
 
-    db.reservations.update_one(
-        {"_id": ObjectId(id)},
+    res = db.reservations.find_one_and_update(
+        {"_id": ObjectId(id), "status": {"$in": ["pending", "ready"]}},
         {"$set": {"status": "cancelled"}}
     )
+
+    if not res:
+        raise HTTPException(status_code=400, detail="Reservation could not be cancelled. It may have already been cancelled or fulfilled.")
 
     # If the reservation was already 'ready', it means a physical copy was being held. We must release it.
     if res.get("status") == "ready":
         book_id = res["book_id"]
-        # Check for next pending reservation
-        next_res = db.reservations.find_one(
+        # Check for next pending reservation atomically
+        next_res = db.reservations.find_one_and_update(
             {"book_id": book_id, "status": "pending"},
+            {"$set": {"status": "ready"}},
             sort=[("reserved_at", 1)]
         )
         
         if next_res:
             # Pass the held copy to the next reserver
-            db.reservations.update_one(
-                {"_id": next_res["_id"]},
-                {"$set": {"status": "ready"}}
-            )
             from ..utils.notification_helper import create_notification
             import asyncio
             asyncio.create_task(create_notification(

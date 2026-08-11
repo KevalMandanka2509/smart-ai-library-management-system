@@ -278,7 +278,7 @@ async def get_all_users_admin(
     db=Depends(get_db),
     current_user=Depends(has_permission("admin:manage"))
 ):
-    users_cursor = db.users.find().sort("username", 1)
+    users_cursor = db.users.find().sort("username", 1).limit(1000)
     users = []
     for u in users_cursor:
         role = u.get("role", "member")
@@ -306,6 +306,13 @@ async def create_user_admin(
     if db.users.find_one({"username": payload.username.lower()}):
         raise HTTPException(status_code=400, detail="Username already taken")
 
+    if not security.validate_password_strength(payload.password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be at least 8 characters long and contain at least one uppercase letter, "
+                   "one lowercase letter, one number, and one special character."
+        )
+
     perms = payload.permissions if payload.permissions else ROLE_DEFAULT_PERMISSIONS.get(payload.role, ["books:read"])
 
     doc = {
@@ -320,7 +327,7 @@ async def create_user_admin(
     }
     res = db.users.insert_one(doc)
 
-    log_audit(db, current_admin, "CREATE_USER", f"User:{payload.username}", f"Created {payload.role} user")
+    log_audit(db, current_user, "CREATE_USER", f"User:{payload.username}", f"Created {payload.role} user")
     return {"message": f"User {payload.username} created successfully", "user_id": str(res.inserted_id)}
 
 @router.put("/admin/users/{user_id}/role-permissions")
@@ -337,13 +344,16 @@ async def update_user_role_permissions(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    if user.get("username") == "admin":
+        raise HTTPException(status_code=400, detail="Cannot modify root admin role or permissions")
+
     db.users.update_one(
         {"_id": ObjectId(user_id)},
         {"$set": {"role": payload.role, "permissions": payload.permissions}}
     )
 
     log_audit(
-        db, current_admin, "ASSIGN_PERMISSIONS", f"User:{user.get('username')}",
+        db, current_user, "ASSIGN_PERMISSIONS", f"User:{user.get('username')}",
         f"Updated role to {payload.role} with {len(payload.permissions)} permissions"
     )
     return {"message": "User role and permissions updated successfully"}
@@ -367,10 +377,10 @@ async def update_user_admin(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    # Cannot modify the root admin
-    if user.get("username") == "admin" and payload.email:
-        # Just a safety check if we want to prevent modifying the root admin too much
-        pass
+    # Cannot modify the root admin via this endpoint to downgrade
+    if user.get("username") == "admin":
+        if payload.email or payload.password:
+            raise HTTPException(status_code=400, detail="Cannot modify root admin credentials via this endpoint")
 
     update_fields = {}
     if payload.full_name is not None:
@@ -433,12 +443,12 @@ async def delete_user_admin(
             "original_collection": "students",
             "record": student,
             "deleted_at": datetime.utcnow(),
-            "deleted_by": current_admin.get("username", "admin"),
+            "deleted_by": current_user.get("username", "admin"),
             "display_name": student.get("full_name", user.get("username"))
         })
         db.students.delete_one({"student_id": user.get("username")})
 
-    log_audit(db, current_admin, "DELETE_USER", f"User:{user.get('username')}", "Deleted user and associated records")
+    log_audit(db, current_user, "DELETE_USER", f"User:{user.get('username')}", "Deleted user and associated records")
     return None
 
 @router.get("/admin/audit-logs")

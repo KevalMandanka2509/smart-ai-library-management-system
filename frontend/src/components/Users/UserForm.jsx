@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createAdminUser, updateAdminUser, updateUserRolePermissions } from '../../services/api';
+import { User, Mail, Shield, Key, Check, ShieldCheck, X } from 'lucide-react';
 import './UserForm.css';
 
 const SYSTEM_PERMISSIONS = [
@@ -16,8 +17,7 @@ const SYSTEM_PERMISSIONS = [
 
 const ROLE_DEFAULT_PERMISSIONS = {
   "admin": SYSTEM_PERMISSIONS.map(p => p.code),
-  "librarian": ["books:read", "books:write", "borrows:manage", "fines:manage", "reservations:manage", "students:manage", "reports:view"],
-  "staff": ["books:read", "borrows:manage", "reservations:manage"],
+  "librarian": ["books:read", "books:write", "students:read", "borrows:manage", "reservations:manage"],
   "member": ["books:read"]
 };
 
@@ -133,129 +133,168 @@ const UserForm = ({ user, onSave, onCancel }) => {
   }, {});
 
   return (
-    <div className="user-form-container">
-      <h2>{user?.id ? 'Edit User' : 'Add New System User'}</h2>
-      
-      <form onSubmit={handleSubmit} className="user-form">
+    <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
+      {/* Modal Header */}
+      <div className="modal-header">
+        <div className="modal-title-area">
+          <div className="modal-icon-wrapper">
+            <ShieldCheck size={24} />
+          </div>
+          <div>
+            <h2>{user?.id ? 'Edit User Details' : 'Add New System User'}</h2>
+            <div className="modal-subtitle">
+              {user?.id ? 'Modify user account and access roles' : 'Create a new staff or admin account'}
+            </div>
+          </div>
+        </div>
+        <button type="button" className="modal-close-btn" onClick={onCancel} title="Close">
+          <X size={20} />
+        </button>
+      </div>
+
+      {/* Modal Body */}
+      <div className="modal-body">
         {error && (
-          <div className="error-message">
+          <div style={{ marginBottom: '1.25rem', padding: '0.8rem 1rem', background: '#fef2f2', border: '1px solid #fee2e2', color: '#b91c1c', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
             {error}
-            <button type="button" onClick={() => setError('')}>✕</button>
+            <button type="button" style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }} onClick={() => setError('')}>✕</button>
           </div>
         )}
         
         {success && (
-          <div className="success-message">
+          <div style={{ marginBottom: '1.25rem', padding: '0.8rem 1rem', background: '#ecfdf5', border: '1px solid #d1fae5', color: '#047857', borderRadius: '12px', fontSize: '0.9rem' }}>
             {success}
           </div>
         )}
 
-        <div className="form-grid">
-          {/* Left Column: Basic Details */}
-          <div className="form-column">
-            <h4 className="section-title">Account Details</h4>
-            
-            <div className="form-group">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          <div className="premium-form-grid two-cols">
+            <div className="premium-form-group">
               <label>Username *</label>
-              <input
-                type="text"
-                name="username"
-                value={formData.username}
-                onChange={handleChange}
-                placeholder="johndoe"
-                disabled={!!user} // Cannot change username after creation
-                required
-              />
-              {user && <small>Username cannot be changed</small>}
+              <div className="premium-input-wrapper">
+                <User className="premium-input-icon" size={16} />
+                <input
+                  type="text"
+                  name="username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  placeholder="e.g. johndoe"
+                  disabled={!!user}
+                  required
+                />
+              </div>
             </div>
 
-            <div className="form-group">
+            <div className="premium-form-group">
               <label>Full Name *</label>
-              <input
-                type="text"
-                name="full_name"
-                value={formData.full_name}
-                onChange={handleChange}
-                placeholder="John Doe"
-                required
-              />
+              <div className="premium-input-wrapper">
+                <User className="premium-input-icon" size={16} />
+                <input
+                  type="text"
+                  name="full_name"
+                  value={formData.full_name}
+                  onChange={handleChange}
+                  placeholder="e.g. John Doe"
+                  required
+                />
+              </div>
             </div>
 
-            <div className="form-group">
+            <div className="premium-form-group">
               <label>Email *</label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="john@example.com"
-                required
-              />
+              <div className="premium-input-wrapper">
+                <Mail className="premium-input-icon" size={16} />
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="e.g. john@example.com"
+                  required
+                />
+              </div>
             </div>
 
-            <div className="form-group">
+            <div className="premium-form-group">
               <label>{user ? 'Reset Password' : 'Password *'}</label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder={user ? 'Leave blank to keep current' : 'Enter strong password'}
-                required={!user}
-              />
-              <small>Must contain uppercase, lowercase, number, and special char.</small>
+              <div className="premium-input-wrapper">
+                <Key className="premium-input-icon" size={16} />
+                <input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder={user ? 'Leave blank to keep current' : 'Enter strong password'}
+                  required={!user}
+                />
+              </div>
             </div>
-            
-            <div className="form-group">
+
+            <div className="premium-form-group" style={{ gridColumn: '1 / -1' }}>
               <label>System Role *</label>
-              <select
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                required
-                disabled={user?.username === 'admin'} // Protect root admin
-              >
-                <option value="member">Member (Student)</option>
-                <option value="librarian">Librarian</option>
-                <option value="admin">Administrator</option>
-              </select>
+              <div className="premium-input-wrapper">
+                <Shield className="premium-input-icon" size={16} />
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  required
+                  disabled={user?.username === 'admin'}
+                >
+                  <option value="member">Member (Student)</option>
+                  <option value="librarian">Librarian</option>
+                  <option value="admin">Administrator</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          {/* Right Column: Permissions */}
-          <div className="form-column permissions-column">
-            <h4 className="section-title">Access Permissions</h4>
-            <p className="permissions-hint">Toggle specific access rights for this user.</p>
-            
-            <div className="permissions-container">
+          <div style={{ borderTop: '1px dashed rgba(212,160,23,0.3)', paddingTop: '1.25rem' }}>
+            <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: 'var(--ink)' }}>Access Permissions</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {Object.entries(groupedPermissions).map(([category, perms]) => (
-                <div key={category} className="permission-group">
-                  <h5 className="permission-category">{category}</h5>
-                  {perms.map(p => (
-                    <label key={p.code} className="permission-label">
-                      <input
-                        type="checkbox"
-                        checked={formData.permissions.includes(p.code)}
-                        onChange={() => handlePermissionToggle(p.code)}
-                        disabled={formData.role === 'admin' || user?.username === 'admin'} // Admin has all rights
-                      />
-                      <span>{p.name}</span>
-                    </label>
-                  ))}
+                <div key={category} style={{ background: '#fffdf9', border: '1px solid rgba(212,160,23,0.15)', borderRadius: '12px', padding: '1rem' }}>
+                  <h5 style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>{category}</h5>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem' }}>
+                    {perms.map(p => (
+                      <label key={p.code} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: (formData.role === 'admin' || user?.username === 'admin') ? 'not-allowed' : 'pointer', opacity: (formData.role === 'admin' || user?.username === 'admin') ? 0.6 : 1 }}>
+                        <div style={{ 
+                          width: '18px', height: '18px', borderRadius: '4px', border: '1.5px solid var(--gold)', 
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: formData.permissions.includes(p.code) ? 'var(--gold)' : 'transparent'
+                        }}>
+                          {formData.permissions.includes(p.code) && <Check size={12} color="#fff" strokeWidth={3} />}
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={formData.permissions.includes(p.code)}
+                          onChange={() => handlePermissionToggle(p.code)}
+                          disabled={formData.role === 'admin' || user?.username === 'admin'}
+                          style={{ display: 'none' }}
+                        />
+                        <span style={{ fontSize: '0.85rem', color: 'var(--ink)' }}>{p.name}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
+          
         </div>
+      </div>
 
-        <div className="form-actions">
-          <button type="submit" disabled={loading} className="btn-save">
-            {loading ? 'Saving...' : 'Save User'}
-          </button>
-          <button type="button" onClick={onCancel} className="btn-cancel">Cancel</button>
-        </div>
-      </form>
-    </div>
+      {/* Modal Footer */}
+      <div className="modal-footer">
+        <button type="button" className="modal-btn modal-btn-cancel" onClick={onCancel} disabled={loading}>
+          Cancel
+        </button>
+        <button type="submit" className="modal-btn modal-btn-save" disabled={loading}>
+          {loading ? 'Saving...' : 'Save User'}
+        </button>
+      </div>
+    </form>
   );
 };
 

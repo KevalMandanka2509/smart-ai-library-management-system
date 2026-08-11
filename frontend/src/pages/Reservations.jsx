@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getActiveReservations, reserveBook, cancelReservation } from '../services/api';
 import { formatIST } from '../utils/dateUtils';
 import { PageHeader, DataTable, StatusBadge } from '../components/layout/EnterpriseLibrary';
@@ -11,8 +12,9 @@ const Reservations = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   
+  const [searchParams] = useSearchParams();
   // Create reservation state
-  const [bookIdInput, setBookIdInput] = useState('');
+  const [bookIdInput, setBookIdInput] = useState(searchParams.get('book_id') || '');
   const [studentIdInput, setStudentIdInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -25,6 +27,13 @@ const Reservations = () => {
   useEffect(() => {
     loadReservationsList();
   }, []);
+
+  useEffect(() => {
+    const passedBookId = searchParams.get('book_id');
+    if (passedBookId) {
+      setBookIdInput(passedBookId);
+    }
+  }, [searchParams]);
 
   const loadReservationsList = async () => {
     try {
@@ -80,7 +89,7 @@ const Reservations = () => {
   };
 
   return (
-    <div className="dashboard-wrapper" style={{ padding: '2rem' }}>
+    <div className="premium-page-wrapper" style={{ padding: '2rem' }}>
       {/* ── PageHeader Component Migration ── */}
       <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
         <PageHeader
@@ -209,3 +218,4 @@ const Reservations = () => {
 };
 
 export default Reservations;
+

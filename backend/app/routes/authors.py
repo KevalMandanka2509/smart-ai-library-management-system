@@ -253,10 +253,10 @@ async def delete_author(
             detail=f"Author with ID {author_id} not found"
         )
 
-    # Safe delete: check if any books reference this author_id
+    # Safe delete: check if any books reference this author
     books_collection = db.books
     books_with_author = books_collection.count_documents({
-        "author_id": author_id
+        "author": author.get("name")
     })
     if books_with_author > 0:
         raise HTTPException(

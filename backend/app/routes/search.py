@@ -83,12 +83,30 @@ async def search_books_advanced(
     if year_to is not None:
         filt.setdefault("publication_year", {})["$lte"] = year_to
 
-    total = db.books.count_documents(filt)
-    total_pages = max(1, -(-total // page_size))
     skip = (page - 1) * page_size
     sort_dir = 1 if sort_order == "asc" else -1
 
-    cursor = db.books.find(filt).sort(sort_by, sort_dir).skip(skip).limit(page_size)
+    pipeline = [
+        {"$match": filt},
+        {"$facet": {
+            "metadata": [{"$count": "total"}],
+            "data": [
+                {"$sort": {sort_by: sort_dir}},
+                {"$skip": skip},
+                {"$limit": page_size}
+            ]
+        }}
+    ]
+    
+    agg_result = list(db.books.aggregate(pipeline))
+    total = 0
+    cursor = []
+    if agg_result:
+        metadata = agg_result[0].get("metadata", [])
+        total = metadata[0]["total"] if metadata else 0
+        cursor = agg_result[0].get("data", [])
+
+    total_pages = max(1, -(-total // page_size))
 
     highlight_term = q or title or isbn or author or genre or publisher or ""
     book_fields = ["title", "author", "isbn", "publisher", "genre"]
@@ -165,12 +183,30 @@ async def search_students_advanced(
     if is_active is not None:
         filt["is_active"] = is_active
 
-    total = db.students.count_documents(filt)
-    total_pages = max(1, -(-total // page_size))
     skip = (page - 1) * page_size
     sort_dir = 1 if sort_order == "asc" else -1
 
-    cursor = db.students.find(filt).sort(sort_by, sort_dir).skip(skip).limit(page_size)
+    pipeline = [
+        {"$match": filt},
+        {"$facet": {
+            "metadata": [{"$count": "total"}],
+            "data": [
+                {"$sort": {sort_by: sort_dir}},
+                {"$skip": skip},
+                {"$limit": page_size}
+            ]
+        }}
+    ]
+    
+    agg_result = list(db.students.aggregate(pipeline))
+    total = 0
+    cursor = []
+    if agg_result:
+        metadata = agg_result[0].get("metadata", [])
+        total = metadata[0]["total"] if metadata else 0
+        cursor = agg_result[0].get("data", [])
+
+    total_pages = max(1, -(-total // page_size))
 
     highlight_term = q or student_id or course or department or ""
     student_fields = ["full_name", "student_id", "email", "course", "department"]

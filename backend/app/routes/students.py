@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, Response
 from bson import ObjectId
 from typing import List, Optional
 from datetime import datetime
@@ -27,25 +27,19 @@ async def create_student(
     """
     collection = db.students
     
-    # Check if student_id exists
-    existing = collection.find_one({"student_id": student.student_id})
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Student with ID {student.student_id} already exists"
-        )
-    
-    # Check if email exists
-    existing_email = collection.find_one({"email": student.email.lower()})
-    if existing_email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Student with email {student.email} already exists"
-        )
-    
     # Create new student
     new_student = student_document(student.dict())
-    result = collection.insert_one(new_student)
+    
+    from pymongo.errors import DuplicateKeyError
+    try:
+        result = collection.insert_one(new_student)
+    except DuplicateKeyError as e:
+        error_msg = str(e)
+        field = "email" if "email" in error_msg else "student_id"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Student with this {field} already exists"
+        )
     
     inserted_student = collection.find_one({"_id": result.inserted_id})
     return serialize_student(inserted_student)
@@ -55,6 +49,7 @@ async def create_student(
 # ============================================
 @router.get("/", response_model=List[StudentResponse])
 async def get_all_students(
+    response: Response,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db=Depends(get_db),
@@ -63,6 +58,8 @@ async def get_all_students(
     """
     Get all students with pagination.
     """
+    total = db.students.count_documents({})
+    response.headers["X-Total-Count"] = str(total)
     students = db.students.find().skip(skip).limit(limit)
     return serialize_students(list(students))
 
@@ -156,45 +153,40 @@ async def update_student(
     if current_user.get("role") not in ["admin", "librarian"]:
         update_data.pop("is_active", None)
     
-    # Check student_id uniqueness if being updated
+    # Check student_id modification authorization
     if "student_id" in update_data and update_data["student_id"] != student.get("student_id"):
         if current_user.get("role") not in ["admin", "librarian"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only administrators can modify student IDs"
             )
-        existing = collection.find_one({"student_id": update_data["student_id"]})
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Student ID {update_data['student_id']} already exists"
-            )
-    
-    # Check email uniqueness if being updated
-    if "email" in update_data and update_data["email"].lower() != student.get("email", "").lower():
-        existing = collection.find_one({"email": update_data["email"].lower()})
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Email {update_data['email']} already exists"
-            )
     
     # Add updated_at timestamp
     update_data["updated_at"] = datetime.utcnow()
     
     from pymongo import ReturnDocument
+    from pymongo.errors import DuplicateKeyError
+    
     # Update in MongoDB
-    if ObjectId.is_valid(student_id):
-        updated_student = collection.find_one_and_update(
-            {"_id": ObjectId(student_id)},
-            {"$set": update_data},
-            return_document=ReturnDocument.AFTER
-        )
-    else:
-        updated_student = collection.find_one_and_update(
-            {"student_id": student_id},
-            {"$set": update_data},
-            return_document=ReturnDocument.AFTER
+    try:
+        if ObjectId.is_valid(student_id):
+            updated_student = collection.find_one_and_update(
+                {"_id": ObjectId(student_id)},
+                {"$set": update_data},
+                return_document=ReturnDocument.AFTER
+            )
+        else:
+            updated_student = collection.find_one_and_update(
+                {"student_id": student_id},
+                {"$set": update_data},
+                return_document=ReturnDocument.AFTER
+            )
+    except DuplicateKeyError as e:
+        error_msg = str(e)
+        field = "email" if "email" in error_msg else "student_id"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Student with this {field} already exists"
         )
     
     return serialize_student(updated_student)
@@ -235,14 +227,14 @@ async def delete_student(
             detail=f"Cannot delete student. They have {active_borrows} active borrow(s)."
         )
         
-    unpaid_fines = db.fines.count_documents({"student_id": actual_student_id, "status": "unpaid"})
+    unpaid_fines = db.fines.count_documents({"student_id": actual_student_id, "paid": False})
     if unpaid_fines > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot delete student. They have {unpaid_fines} unpaid fine(s)."
         )
         
-    active_reservations = db.reservations.count_documents({"student_id": actual_student_id, "status": "active"})
+    active_reservations = db.reservations.count_documents({"student_id": actual_student_id, "status": {"$in": ["pending", "ready"]}})
     if active_reservations > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -276,6 +268,7 @@ async def delete_student(
 # ============================================
 @router.get("/search/", response_model=List[StudentResponse])
 async def search_students(
+    response: Response,
     query: str = Query(None, min_length=1),
     course: str = Query(None, min_length=1),
     department: str = Query(None, min_length=1),
@@ -313,6 +306,8 @@ async def search_students(
     if is_active is not None:
         search_filter["is_active"] = is_active
     
+    total = collection.count_documents(search_filter)
+    response.headers["X-Total-Count"] = str(total)
     students = collection.find(search_filter).skip(skip).limit(limit)
     return serialize_students(list(students))
 
@@ -392,8 +387,19 @@ async def bulk_delete_students(
         "$or": [
             {"_id": {"$in": object_ids}},
             {"student_id": {"$in": custom_ids}}
-        ] if 'students' == 'students' else {"_id": {"$in": object_ids}}
+        ]
     }))
+    
+    # Safe delete checks for bulk
+    for student in records_to_delete:
+        actual_student_id = student.get("student_id")
+        if db.borrows.count_documents({"student_id": actual_student_id, "status": "issued"}) > 0:
+            raise HTTPException(status_code=400, detail=f"Cannot delete student {actual_student_id}. They have active borrow(s).")
+        if db.fines.count_documents({"student_id": actual_student_id, "paid": False}) > 0:
+            raise HTTPException(status_code=400, detail=f"Cannot delete student {actual_student_id}. They have unpaid fine(s).")
+        if db.reservations.count_documents({"student_id": actual_student_id, "status": {"$in": ["pending", "ready"]}}) > 0:
+            raise HTTPException(status_code=400, detail=f"Cannot delete student {actual_student_id}. They have active reservation(s).")
+            
     if records_to_delete:
         recycle_docs = [
             {

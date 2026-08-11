@@ -233,7 +233,8 @@ const Settings = () => {
         ].filter(([tab, label]) => {
           if (userRole === 'admin') return true;
           if (userRole === 'librarian') return ['library', 'borrow', 'fine'].includes(tab);
-          return false; // member/user gets no tabs or access
+          if (userRole === 'member') return ['general', 'library'].includes(tab);
+          return false;
         }).map(([tab, label]) => (
           <button
             key={tab}
@@ -259,65 +260,71 @@ const Settings = () => {
         {activeTab === 'general' && (
           <form onSubmit={handleSaveSettings}>
             <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: '800', color: '#1e1b15' }}>General System Information</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>SYSTEM / PORTAL NAME</label>
-                <input
-                  type="text" required
-                  value={settings.general?.system_name || ''}
-                  onChange={e => handleFieldChange('general', 'system_name', e.target.value)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+              <div className="premium-form-group">
+                <label>System / Portal Name</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="text" required
+                    value={settings.general?.system_name || ''}
+                    onChange={e => handleFieldChange('general', 'system_name', e.target.value)}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>TAGLINE / SUBHEADER</label>
-                <input
-                  type="text"
-                  value={settings.general?.tagline || ''}
-                  onChange={e => handleFieldChange('general', 'tagline', e.target.value)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+              <div className="premium-form-group">
+                <label>Tagline / Subheader</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="text"
+                    value={settings.general?.tagline || ''}
+                    onChange={e => handleFieldChange('general', 'tagline', e.target.value)}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>CONTACT EMAIL</label>
-                <input
-                  type="email" required
-                  value={settings.general?.contact_email || ''}
-                  onChange={e => handleFieldChange('general', 'contact_email', e.target.value)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+              <div className="premium-form-group">
+                <label>Contact Email</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="email" required
+                    value={settings.general?.contact_email || ''}
+                    onChange={e => handleFieldChange('general', 'contact_email', e.target.value)}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>CONTACT PHONE</label>
-                <input
-                  type="text"
-                  value={settings.general?.contact_phone || ''}
-                  onChange={e => handleFieldChange('general', 'contact_phone', e.target.value)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+              <div className="premium-form-group">
+                <label>Contact Phone</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="text"
+                    value={settings.general?.contact_phone || ''}
+                    onChange={e => handleFieldChange('general', 'contact_phone', e.target.value)}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>TIMEZONE</label>
-                <select
-                  value={settings.general?.timezone || 'UTC'}
-                  onChange={e => handleFieldChange('general', 'timezone', e.target.value)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none', background: '#fff' }}
-                >
-                  <option value="UTC">UTC (Universal Time)</option>
-                  <option value="EST">EST (Eastern Standard Time)</option>
-                  <option value="CST">CST (Central Standard Time)</option>
-                  <option value="PST">PST (Pacific Standard Time)</option>
-                  <option value="IST">IST (Indian Standard Time)</option>
-                </select>
+              <div className="premium-form-group">
+                <label>Timezone</label>
+                <div className="premium-input-wrapper no-icon">
+                  <select
+                    value={settings.general?.timezone || 'UTC'}
+                    onChange={e => handleFieldChange('general', 'timezone', e.target.value)}
+                  >
+                    <option value="UTC">UTC (Universal Time)</option>
+                    <option value="EST">EST (Eastern Standard Time)</option>
+                    <option value="CST">CST (Central Standard Time)</option>
+                    <option value="PST">PST (Pacific Standard Time)</option>
+                    <option value="IST">IST (Indian Standard Time)</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>CURRENCY SYMBOL</label>
-                <input
-                  type="text"
-                  value={settings.general?.currency_symbol || '₹'}
-                  onChange={e => handleFieldChange('general', 'currency_symbol', e.target.value)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+              <div className="premium-form-group">
+                <label>Currency Symbol</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="text"
+                    value={settings.general?.currency_symbol || '₹'}
+                    onChange={e => handleFieldChange('general', 'currency_symbol', e.target.value)}
+                  />
+                </div>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -334,42 +341,46 @@ const Settings = () => {
         {activeTab === 'library' && (
           <form onSubmit={handleSaveSettings}>
             <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: '800', color: '#1e1b15' }}>Library Operating & Capacity Rules</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>OPERATING HOURS</label>
-                <input
-                  type="text"
-                  value={settings.library?.operating_hours || ''}
-                  onChange={e => handleFieldChange('library', 'operating_hours', e.target.value)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+              <div className="premium-form-group">
+                <label>Operating Hours</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="text"
+                    value={settings.library?.operating_hours || ''}
+                    onChange={e => handleFieldChange('library', 'operating_hours', e.target.value)}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>MAX BOOKS PER STUDENT</label>
-                <input
-                  type="number" min="1" max="20"
-                  value={settings.library?.max_books_per_student || 5}
-                  onChange={e => handleFieldChange('library', 'max_books_per_student', parseInt(e.target.value) || 1)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+              <div className="premium-form-group">
+                <label>Max Books Per Student</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="number" min="1" max="20"
+                    value={settings.library?.max_books_per_student || 5}
+                    onChange={e => handleFieldChange('library', 'max_books_per_student', parseInt(e.target.value) || 1)}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>MAX RESERVATION EXPIRY (DAYS)</label>
-                <input
-                  type="number" min="1" max="30"
-                  value={settings.library?.max_reservation_days || 7}
-                  onChange={e => handleFieldChange('library', 'max_reservation_days', parseInt(e.target.value) || 1)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+              <div className="premium-form-group">
+                <label>Max Reservation Expiry (Days)</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="number" min="1" max="30"
+                    value={settings.library?.max_reservation_days || 7}
+                    onChange={e => handleFieldChange('library', 'max_reservation_days', parseInt(e.target.value) || 1)}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>MAX RENEWAL COUNT</label>
-                <input
-                  type="number" min="0" max="10"
-                  value={settings.library?.max_renew_count || 2}
-                  onChange={e => handleFieldChange('library', 'max_renew_count', parseInt(e.target.value) || 0)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+              <div className="premium-form-group">
+                <label>Max Renewal Count</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="number" min="0" max="10"
+                    value={settings.library?.max_renew_count || 2}
+                    onChange={e => handleFieldChange('library', 'max_renew_count', parseInt(e.target.value) || 0)}
+                  />
+                </div>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -386,42 +397,46 @@ const Settings = () => {
         {activeTab === 'borrow' && (
           <form onSubmit={handleSaveSettings}>
             <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: '800', color: '#1e1b15' }}>Borrowing Policy Configurations</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>DEFAULT BORROW PERIOD (DAYS)</label>
-                <input
-                  type="number" min="1" max="90"
-                  value={settings.borrow?.default_borrow_days || 14}
-                  onChange={e => handleFieldChange('borrow', 'default_borrow_days', parseInt(e.target.value) || 14)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+              <div className="premium-form-group">
+                <label>Default Borrow Period (Days)</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="number" min="1" max="90"
+                    value={settings.borrow?.default_borrow_days || 14}
+                    onChange={e => handleFieldChange('borrow', 'default_borrow_days', parseInt(e.target.value) || 14)}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>GRACE PERIOD BEFORE FINE (DAYS)</label>
-                <input
-                  type="number" min="0" max="30"
-                  value={settings.borrow?.grace_period_days || 2}
-                  onChange={e => handleFieldChange('borrow', 'grace_period_days', parseInt(e.target.value) || 0)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+              <div className="premium-form-group">
+                <label>Grace Period Before Fine (Days)</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="number" min="0" max="30"
+                    value={settings.borrow?.grace_period_days || 2}
+                    onChange={e => handleFieldChange('borrow', 'grace_period_days', parseInt(e.target.value) || 0)}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>AUTO REMINDER DAYS BEFORE DUE</label>
-                <input
-                  type="number" min="1" max="14"
-                  value={settings.borrow?.auto_remind_days_before || 3}
-                  onChange={e => handleFieldChange('borrow', 'auto_remind_days_before', parseInt(e.target.value) || 3)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+              <div className="premium-form-group">
+                <label>Auto Reminder Days Before Due</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="number" min="1" max="14"
+                    value={settings.borrow?.auto_remind_days_before || 3}
+                    onChange={e => handleFieldChange('borrow', 'auto_remind_days_before', parseInt(e.target.value) || 3)}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>FINE BLOCK LIMIT (₹)</label>
-                <input
-                  type="number" min="0" step="0.5"
-                  value={settings.borrow?.max_fine_limit_for_borrow || 20.0}
-                  onChange={e => handleFieldChange('borrow', 'max_fine_limit_for_borrow', parseFloat(e.target.value) || 0)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+              <div className="premium-form-group">
+                <label>Fine Block Limit (₹)</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="number" min="0" step="0.5"
+                    value={settings.borrow?.max_fine_limit_for_borrow || 20.0}
+                    onChange={e => handleFieldChange('borrow', 'max_fine_limit_for_borrow', parseFloat(e.target.value) || 0)}
+                  />
+                </div>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -438,24 +453,26 @@ const Settings = () => {
         {activeTab === 'fine' && (
           <form onSubmit={handleSaveSettings}>
             <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: '800', color: '#1e1b15' }}>Fine Rate & Penalty Structure</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>DAILY FINE RATE (₹/DAY)</label>
-                <input
-                  type="number" min="0" step="0.1"
-                  value={settings.fine?.daily_fine_rate || 1.50}
-                  onChange={e => handleFieldChange('fine', 'daily_fine_rate', parseFloat(e.target.value) || 0)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+              <div className="premium-form-group">
+                <label>Daily Fine Rate (₹/Day)</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="number" min="0" step="0.1"
+                    value={settings.fine?.daily_fine_rate || 1.50}
+                    onChange={e => handleFieldChange('fine', 'daily_fine_rate', parseFloat(e.target.value) || 0)}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>MAX FINE CAP PER BOOK (₹)</label>
-                <input
-                  type="number" min="0" step="1"
-                  value={settings.fine?.max_fine_per_book || 50.0}
-                  onChange={e => handleFieldChange('fine', 'max_fine_per_book', parseFloat(e.target.value) || 0)}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                />
+              <div className="premium-form-group">
+                <label>Max Fine Cap Per Book (₹)</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input
+                    type="number" min="0" step="1"
+                    value={settings.fine?.max_fine_per_book || 50.0}
+                    onChange={e => handleFieldChange('fine', 'max_fine_per_book', parseFloat(e.target.value) || 0)}
+                  />
+                </div>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -479,46 +496,50 @@ const Settings = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>SMTP SERVER HOST</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. smtp.gmail.com"
-                    value={settings.email?.smtp_host || ''}
-                    onChange={e => handleFieldChange('email', 'smtp_host', e.target.value)}
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                  />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                <div className="premium-form-group">
+                  <label>SMTP Server Host</label>
+                  <div className="premium-input-wrapper no-icon">
+                    <input
+                      type="text"
+                      placeholder="e.g. smtp.gmail.com"
+                      value={settings.email?.smtp_host || ''}
+                      onChange={e => handleFieldChange('email', 'smtp_host', e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>SMTP PORT</label>
-                  <input
-                    type="number"
-                    placeholder="587"
-                    value={settings.email?.smtp_port || 587}
-                    onChange={e => handleFieldChange('email', 'smtp_port', parseInt(e.target.value) || 587)}
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                  />
+                <div className="premium-form-group">
+                  <label>SMTP Port</label>
+                  <div className="premium-input-wrapper no-icon">
+                    <input
+                      type="number"
+                      placeholder="587"
+                      value={settings.email?.smtp_port || 587}
+                      onChange={e => handleFieldChange('email', 'smtp_port', parseInt(e.target.value) || 587)}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>SMTP USERNAME / EMAIL</label>
-                  <input
-                    type="text"
-                    placeholder="user@example.com"
-                    value={settings.email?.smtp_user || ''}
-                    onChange={e => handleFieldChange('email', 'smtp_user', e.target.value)}
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                  />
+                <div className="premium-form-group">
+                  <label>SMTP Username / Email</label>
+                  <div className="premium-input-wrapper no-icon">
+                    <input
+                      type="text"
+                      placeholder="user@example.com"
+                      value={settings.email?.smtp_user || ''}
+                      onChange={e => handleFieldChange('email', 'smtp_user', e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.35rem' }}>SENDER DISPLAY NAME</label>
-                  <input
-                    type="text"
-                    placeholder="Smart AI Library"
-                    value={settings.email?.sender_name || ''}
-                    onChange={e => handleFieldChange('email', 'sender_name', e.target.value)}
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none' }}
-                  />
+                <div className="premium-form-group">
+                  <label>Sender Display Name</label>
+                  <div className="premium-input-wrapper no-icon">
+                    <input
+                      type="text"
+                      placeholder="Smart AI Library"
+                      value={settings.email?.sender_name || ''}
+                      onChange={e => handleFieldChange('email', 'sender_name', e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
 

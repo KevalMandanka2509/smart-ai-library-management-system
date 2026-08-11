@@ -174,6 +174,16 @@ class Database:
         # ── Backup History ──
         self._ensure_index(db.backup_history, [("created_at", DESCENDING)])
         
+        # ── SMS Logs ──
+        self._ensure_index(db.sms_logs, "recipient")
+        self._ensure_index(db.sms_logs, "status")
+        self._ensure_index(db.sms_logs, [("status", ASCENDING), ("dispatched_at", DESCENDING)])
+        
+        # ── Email Logs ──
+        self._ensure_index(db.email_logs, "recipient")
+        self._ensure_index(db.email_logs, "status")
+        self._ensure_index(db.email_logs, [("status", ASCENDING), ("dispatched_at", DESCENDING)])
+        
         logger.info("✅ All indexes created successfully")
 
 # Singleton instance

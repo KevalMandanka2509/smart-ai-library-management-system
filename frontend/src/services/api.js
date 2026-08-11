@@ -62,6 +62,8 @@ api.interceptors.response.use(
   }
 );
 
+export { api };
+
 // ===== Auth API =====
 export const login = async (email, password) => {
   const response = await api.post('/auth/login', { email, password });
@@ -147,7 +149,10 @@ export const deleteStudent = async (id) => {
 
 export const searchStudents = async (params) => {
   const response = await api.get('/students/search/', { params });
-  return response.data;
+  return {
+    students: response.data,
+    total: parseInt(response.headers['x-total-count'] || '0', 10)
+  };
 };
 
 export const getStudentStats = async () => {
@@ -156,13 +161,13 @@ export const getStudentStats = async () => {
 };
 
 export const bulkDeleteStudents = async (studentIds) => {
-  const response = await api.post('/students/bulk-delete/', { student_ids: studentIds });
+  const response = await api.post('/students/bulk-delete', { ids: studentIds });
   return response.data;
 };
 
-export const exportStudentsCsvUrl = () => {
-  const token = localStorage.getItem('access_token');
-  return `http://localhost:8000/api/v1/students/export/csv?token=${token || ''}`;
+export const exportStudentsCsv = async () => {
+  const response = await api.get('/students/export/csv', { responseType: 'blob' });
+  return response.data;
 };
 
 export const importStudentsCsv = async (file) => {
@@ -235,13 +240,13 @@ export const getGenres = async () => {
 };
 
 export const bulkDeleteBooks = async (bookIds) => {
-  const response = await api.post('/books/bulk-delete/', { book_ids: bookIds });
+  const response = await api.post('/books/bulk-delete', { ids: bookIds });
   return response.data;
 };
 
-export const exportBooksCsvUrl = () => {
-  const token = localStorage.getItem('access_token');
-  return `${API_BASE_URL}/books/export/csv?token=${token || ''}`;
+export const exportBooksCsv = async () => {
+  const response = await api.get('/books/export/csv', { responseType: 'blob' });
+  return response.data;
 };
 
 export const importBooksCsv = async (file) => {

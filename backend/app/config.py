@@ -16,7 +16,9 @@ class Settings:
     DATABASE_NAME: str = os.getenv("DATABASE_NAME", "library_db")
     
     # ===== JWT Settings =====
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-this")
+    SECRET_KEY: str = os.getenv("SECRET_KEY")
+    if not SECRET_KEY:
+        raise ValueError("SECRET_KEY environment variable is missing. It is required for security.")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -28,6 +30,8 @@ class Settings:
     BCRYPT_ROUNDS: int = 12
     MAX_LOGIN_ATTEMPTS: int = 5
     LOCKOUT_DURATION_MINUTES: int = 15
+    DEFAULT_ADMIN_EMAIL: str = os.getenv("DEFAULT_ADMIN_EMAIL")
+    DEFAULT_ADMIN_PASSWORD: str = os.getenv("DEFAULT_ADMIN_PASSWORD")
 
     # ===== SMTP Email Settings =====
     SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")

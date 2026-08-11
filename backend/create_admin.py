@@ -12,7 +12,15 @@ def create_admin():
     db = client[settings.DATABASE_NAME]
     collection = db.users
 
-    existing = collection.find_one({"email": "admin@library.com"})
+    if not settings.DEFAULT_ADMIN_EMAIL or not settings.DEFAULT_ADMIN_PASSWORD:
+        print("[ERROR] DEFAULT_ADMIN_EMAIL and DEFAULT_ADMIN_PASSWORD must be set in environment variables")
+        return
+
+    admin_email = settings.DEFAULT_ADMIN_EMAIL
+    admin_password = settings.DEFAULT_ADMIN_PASSWORD
+    admin_username = admin_email.split('@')[0]
+
+    existing = collection.find_one({"email": admin_email})
     if existing:
         needs_fix = False
         # Fix legacy 'hashed_password' field
@@ -41,16 +49,15 @@ def create_admin():
             print(f"[FIXED] Added missing fields: {list(update_fields.keys())}")
             needs_fix = True
 
-        # Verify stored password hash actually matches 'Admin@123'
-        admin = collection.find_one({"email": "admin@library.com"})
+        admin = collection.find_one({"email": admin_email})
         stored_pw = admin.get("password", "")
-        if not stored_pw or not security.verify_password("Admin@123", stored_pw):
-            new_hash = security.hash_password("Admin@123")
+        if not stored_pw or not security.verify_password(admin_password, stored_pw):
+            new_hash = security.hash_password(admin_password)
             collection.update_one(
                 {"_id": admin["_id"]},
                 {"$set": {"password": new_hash, "login_attempts": 0, "locked_until": None}}
             )
-            print("[FIXED] Password hash was invalid/corrupted - rehashed Admin@123")
+            print(f"[FIXED] Password hash was invalid/corrupted - rehashed {admin_password}")
             needs_fix = True
         else:
             # Reset lockout if account is locked
@@ -66,9 +73,9 @@ def create_admin():
             print("[OK] Admin user already exists and is correctly configured")
 
         # Debug: show stored fields
-        admin = collection.find_one({"email": "admin@library.com"})
+        admin = collection.find_one({"email": admin_email})
         print(f"  Fields: {list(admin.keys())}")
-        pw_ok = security.verify_password("Admin@123", admin.get("password", ""))
+        pw_ok = security.verify_password(admin_password, admin.get("password", ""))
         print(f"  Password verify: {pw_ok}")
         print(f"  Role: {admin.get('role')}")
         print(f"  Username: {admin.get('username')}")
@@ -76,9 +83,9 @@ def create_admin():
         return
 
     admin_data = {
-        "email": "admin@library.com",
-        "username": "admin",
-        "password": security.hash_password("Admin@123"),
+        "email": admin_email,
+        "username": admin_username,
+        "password": security.hash_password(admin_password),
         "full_name": "Super Admin",
         "role": "admin",
         "is_active": True,
@@ -91,8 +98,8 @@ def create_admin():
 
     collection.insert_one(admin_data)
     print("[OK] Admin user created successfully")
-    print("  Email:    admin@library.com")
-    print("  Password: Admin@123")
+    print(f"  Email:    {admin_email}")
+    print("  Password: [SECURELY HASHED]")
     client.close()
 
 if __name__ == "__main__":

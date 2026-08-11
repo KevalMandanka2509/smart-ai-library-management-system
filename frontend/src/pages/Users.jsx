@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { formatIST } from '../utils/dateUtils';
 import { getAdminUsers, deleteAdminUser } from '../services/api';
+import { createPortal } from 'react-dom';
 import UserForm from '../components/Users/UserForm';
 import { PageHeader, DataTable, StatusBadge } from '../components/layout/EnterpriseLibrary';
 import '../styles/design-tokens.css';
@@ -96,7 +97,7 @@ const Users = () => {
     switch (role) {
       case 'admin': return 'danger';
       case 'librarian': return 'gold';
-      case 'staff': return 'warning';
+      case 'member': return 'info';
       default: return 'info';
     }
   };
@@ -160,64 +161,52 @@ const Users = () => {
     }
   ];
 
-  if (isModalOpen) {
-    return (
-      <UserForm 
-        user={selectedUser} 
-        onSave={handleSaveSuccess} 
-        onCancel={handleCloseModal} 
-      />
-    );
-  }
+
 
   return (
     <div className="eu-container" style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
-      <PageHeader 
-        title="System Users" 
-        subtitle="Manage library administrators, staff, and their roles."
-        badgeText={`${users.length} Users`}
-        actions={
-          <button 
-            className="eu-btn eu-btn-primary" 
-            onClick={handleCreateUser}
-            style={{
-              background: 'var(--eu-color-primary, #D4A017)', color: '#fff', border: 'none', 
-              padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold'
-            }}
-          >
-            + Add System User
-          </button>
-        }
-      />
+      <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
+        <PageHeader 
+          title="System Users" 
+          subtitle="Manage library administrators, staff, and their roles."
+          badgeText={`${users.length} Users`}
+          actions={
+            <button className="add-btn" onClick={handleCreateUser}>
+              Add System User
+            </button>
+          }
+        />
+      </div>
 
       {error && <div className="eu-alert eu-alert-danger" style={{ marginBottom: '1rem', padding: '1rem', background: '#fee2e2', color: '#991b1b', borderRadius: '4px' }}>{error}</div>}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', alignItems: 'center' }}>
-        <div style={{ flex: '1 1 300px', display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid #e2d3b3', borderRadius: '4px', padding: '0.5rem' }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" style={{ marginRight: '0.5rem' }}>
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input
-            type="text"
-            placeholder="Search users by name, username, or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ border: 'none', outline: 'none', width: '100%' }}
-          />
+      {/* Advanced Filters Panel */}
+      <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.5)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: 'var(--shadow-soft)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center' }}>
+          <div>
+            <div className="premium-input-wrapper no-icon">
+              <input
+                type="text"
+                placeholder="Search users by name, username, or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+          <div>
+            <div className="premium-input-wrapper no-icon">
+              <select 
+                value={roleFilter} 
+                onChange={(e) => setRoleFilter(e.target.value)}
+              >
+                <option value="">All Roles</option>
+                <option value="admin">Administrator</option>
+                <option value="librarian">Librarian</option>
+                <option value="member">Member</option>
+              </select>
+            </div>
+          </div>
         </div>
-        
-        <select 
-          value={roleFilter} 
-          onChange={(e) => setRoleFilter(e.target.value)}
-          style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #e2d3b3', background: '#fff' }}
-        >
-          <option value="">All Roles</option>
-          <option value="admin">Administrator</option>
-          <option value="librarian">Librarian</option>
-          <option value="staff">Staff</option>
-          <option value="member">Member</option>
-        </select>
       </div>
 
       <div className="eu-card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #e2d3b3', overflow: 'hidden' }}>
@@ -269,8 +258,21 @@ const Users = () => {
         )}
       </div>
 
+      {isModalOpen && createPortal(
+        <div className="modal-overlay">
+          <div className="modal-container modal-container-sm">
+            <UserForm 
+              user={selectedUser} 
+              onSave={handleSaveSuccess} 
+              onCancel={handleCloseModal} 
+            />
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
 
 export default Users;
+

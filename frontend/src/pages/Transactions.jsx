@@ -17,6 +17,7 @@ const Transactions = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isProcessingBulk, setIsProcessingBulk] = useState(false);
 
   // Search & Filtering States
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,6 +70,7 @@ const Transactions = () => {
     if (selectedTxIds.length === 0) return;
     if (!window.confirm(`Are you sure you want to return books for the ${selectedTxIds.length} selected transaction(s)?`)) return;
     try {
+      setIsProcessingBulk(true);
       setError('');
       setSuccess('');
       const res = await bulkReturnBooks(selectedTxIds);
@@ -77,6 +79,8 @@ const Transactions = () => {
       loadTransactionsList();
     } catch (err) {
       setError('Failed to process bulk return.');
+    } finally {
+      setIsProcessingBulk(false);
     }
   };
 
@@ -114,7 +118,7 @@ const Transactions = () => {
   }
 
   return (
-    <div className="dashboard-wrapper" style={{ padding: '2rem' }}>
+    <div className="premium-page-wrapper" style={{ padding: '2rem' }}>
       {/* ── PageHeader Component Migration ── */}
       <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
         <PageHeader
@@ -138,26 +142,28 @@ const Transactions = () => {
       {/* Advanced Filters */}
       <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.5)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: 'var(--shadow-soft)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center' }}>
-          <div className="search-bar" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fffdf9', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', boxShadow: 'none', width: '100%', marginBottom: 0 }}>
-            <input
-              type="text"
-              placeholder="Search student ID, name, book..."
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.95rem' }}
-            />
+          <div>
+            <div className="premium-input-wrapper no-icon">
+              <input
+                type="text"
+                placeholder="Search student ID, name, book..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
           </div>
 
           <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', background: '#fffdf9', color: 'var(--ink)', fontSize: '0.9rem', outline: 'none' }}
-            >
-              <option value="">All Statuses</option>
-              <option value="issued">Issued Only</option>
-              <option value="returned">Returned Only</option>
-            </select>
+            <div className="premium-input-wrapper no-icon">
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+              >
+                <option value="">All Statuses</option>
+                <option value="issued">Issued Only</option>
+                <option value="returned">Returned Only</option>
+              </select>
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingLeft: '0.5rem' }}>
@@ -189,9 +195,10 @@ const Transactions = () => {
           {selectedTxIds.length > 0 && (
             <button
               onClick={handleBulkReturn}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1.25rem', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '8px', color: '#b91c1c', fontWeight: 'bold', cursor: 'pointer' }}
+              disabled={isProcessingBulk}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1.25rem', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '8px', color: '#b91c1c', fontWeight: 'bold', cursor: isProcessingBulk ? 'not-allowed' : 'pointer', opacity: isProcessingBulk ? 0.7 : 1 }}
             >
-              Confirm Bulk Return
+              {isProcessingBulk ? 'Processing...' : 'Confirm Bulk Return'}
             </button>
           )}
         </div>
@@ -265,3 +272,4 @@ const Transactions = () => {
 };
 
 export default Transactions;
+

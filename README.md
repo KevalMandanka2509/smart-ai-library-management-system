@@ -11,7 +11,7 @@ Screenshots of the dashboard, analytics modules, and book catalogue can be found
 
 ## 🛠️ Technical Stack
 - **Backend**: FastAPI, MongoDB (Motor), Pydantic, Python 3.10+
-- **Frontend**: React 18, Vite, CSS Grid & Flexbox, Design Token Architecture
+- **Frontend**: React 19, Vite, CSS Grid & Flexbox, Design Token Architecture
 - **Security**: JWT tokens, OAuth2, Request Rate Limiting, HTTP security headers, CORS guards
 
 ---
@@ -41,13 +41,16 @@ Screenshots of the dashboard, analytics modules, and book catalogue can be found
 ### Backend Configuration (`backend/.env`)
 Create a `.env` file in the backend root directory with the following variables:
 ```ini
-DATABASE_URL=mongodb://localhost:27017
-DATABASE_NAME=smart_library
-SECRET_KEY=supersecretjwtkeychangeinproduction
+MONGODB_URL=mongodb://localhost:27017
+DATABASE_NAME=library_db
+SECRET_KEY=<YOUR_SECURE_SECRET_KEY>
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
+DEFAULT_ADMIN_EMAIL=admin@library.com
+DEFAULT_ADMIN_PASSWORD=<YOUR_SECURE_ADMIN_PASSWORD>
 DEBUG=True
 ```
+> **⚠️ Never commit real secrets to source control.** Replace placeholder values with strong, unique credentials.
 
 ---
 
@@ -102,6 +105,8 @@ Once the backend is running, interactive API documentation is available at:
 ## 🐳 Docker Deployment
 To spin up the entire application, including the MongoDB instance, backend API server, and React client using Docker Compose:
 ```bash
-docker-compose up --build
+SECRET_KEY=<your-secret> DEFAULT_ADMIN_PASSWORD=<your-password> docker-compose up --build
 ```
-This maps the client server to `http://localhost:5173` and the API service to `http://localhost:8000`.
+> `SECRET_KEY` and `DEFAULT_ADMIN_PASSWORD` are **required** environment variables and must be set before starting.
+
+This maps the client server to `http://localhost:80` and the API service to `http://localhost:8000`.

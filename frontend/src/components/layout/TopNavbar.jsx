@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import logo from '../../assets/logo.webp';
 import './TopNavbar.css';
+import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../../services/api';
 
 const TopNavbar = ({ userRole, onLogout }) => {
   const navigate = useNavigate();
@@ -37,11 +38,7 @@ const TopNavbar = ({ userRole, onLogout }) => {
       try {
         const token = localStorage.getItem('access_token');
         if (!token) return;
-        const res = await fetch('http://localhost:8000/api/v1/notifications/', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await getNotifications();
         if (!cancelled) {
           setUnreadCount(data.filter(n => !n.read).length);
           setLatestNotifs(data.slice(0, 5));
@@ -56,11 +53,7 @@ const TopNavbar = ({ userRole, onLogout }) => {
   const handleMarkRead = async (id, e) => {
     e.stopPropagation();
     try {
-      const token = localStorage.getItem('access_token');
-      await fetch(`http://localhost:8000/api/v1/notifications/read/${id}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await markNotificationRead(id);
       setLatestNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (_) { }
@@ -69,11 +62,7 @@ const TopNavbar = ({ userRole, onLogout }) => {
   const handleMarkAllRead = async (e) => {
     e.stopPropagation();
     try {
-      const token = localStorage.getItem('access_token');
-      await fetch('http://localhost:8000/api/v1/notifications/read-all', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await markAllNotificationsRead();
       setLatestNotifs(prev => prev.map(n => ({ ...n, read: true })));
       setUnreadCount(0);
     } catch (_) { }

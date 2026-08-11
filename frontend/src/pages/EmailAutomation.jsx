@@ -80,7 +80,10 @@ const EmailAutomation = () => {
       setHistoryLoading(true);
       const data = await getEmailHistory(200, historySearch);
       setHistoryLogs(Array.isArray(data) ? data : []);
-    } catch { setHistoryLogs([]); }
+    } catch { 
+      setHistoryLogs([]); 
+      setError('Failed to fetch email history.');
+    }
     finally { setHistoryLoading(false); }
   }, [historySearch]);
 
@@ -89,7 +92,10 @@ const EmailAutomation = () => {
       setTemplatesLoading(true);
       const data = await getEmailTemplates();
       setTemplates(Array.isArray(data) ? data : []);
-    } catch { setTemplates([]); }
+    } catch { 
+      setTemplates([]); 
+      setError('Failed to fetch templates.');
+    }
     finally { setTemplatesLoading(false); }
   }, []);
 
@@ -250,14 +256,14 @@ const EmailAutomation = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="email-tab-nav">
+      <div className="premium-tab-container" style={{ marginBottom: '2rem' }}>
         {tabs.map(tab => (
           <button
             key={tab.id}
-            className={`email-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+            className={`premium-tab ${activeTab === tab.id ? 'active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
-            <span className="email-tab-icon">{tab.icon}</span>
+            <span style={{ marginRight: '0.5rem' }}>{tab.icon}</span>
             {tab.label}
           </button>
         ))}
@@ -271,9 +277,8 @@ const EmailAutomation = () => {
           <h3 className="email-section-title">📋 Dispatch History Log</h3>
           <p className="email-section-subtitle">View all outgoing email records with status, timestamps, and resend controls.</p>
 
-          <div className="email-history-toolbar">
-            <div className="email-search-box">
-              <span className="email-search-icon">🔍</span>
+          <div className="email-history-toolbar" style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <div className="premium-input-wrapper no-icon" style={{ flex: '1', maxWidth: '300px' }}>
               <input
                 type="text"
                 placeholder="Search by recipient, subject, or template..."
@@ -661,3 +666,4 @@ const EmailAutomation = () => {
 };
 
 export default EmailAutomation;
+

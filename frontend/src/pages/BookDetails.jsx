@@ -239,38 +239,74 @@ const BookDetailPage = () => {
             )}
           </div>
 
-          {/* Admin actions */}
-          {isAdmin && (
-            <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
-              <button
-                onClick={() => navigate('/books')}
-                disabled
-                title="Edit functionality available from catalogue view"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-                  background: '#fafafa', border: '1px solid rgba(0,0,0,0.08)',
-                  borderRadius: 10, padding: '0.65rem 1.25rem',
-                  fontWeight: 700, fontSize: '0.85rem', cursor: 'not-allowed',
-                  color: 'var(--ink-soft)', opacity: 0.6,
-                }}
-              >
-                <IconEdit /> Edit
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-                  background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.1)',
-                  borderRadius: 10, padding: '0.65rem 1.25rem',
-                  fontWeight: 700, fontSize: '0.85rem', cursor: deleting ? 'wait' : 'pointer',
-                  color: '#dc2626', transition: 'all 0.2s ease',
-                }}
-              >
-                <IconTrash /> {deleting ? 'Deleting…' : 'Delete'}
-              </button>
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0, flexDirection: 'column', alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              {(book.is_available && book.available_copies > 0) ? (
+                <button
+                  onClick={() => navigate(`/issue-return?book_id=${book.isbn || book.id}`)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                    background: 'linear-gradient(135deg, #e4a81e, #b88610)', 
+                    border: 'none', borderRadius: 10, padding: '0.65rem 1.5rem',
+                    fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
+                    color: '#ffffff', transition: 'all 0.2s ease',
+                    boxShadow: '0 4px 10px rgba(212,160,23,0.3)'
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                  Borrow
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate(`/reservations?book_id=${book.isbn || book.id}`)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                    background: 'linear-gradient(135deg, #3b82f6, #2563eb)', 
+                    border: 'none', borderRadius: 10, padding: '0.65rem 1.5rem',
+                    fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
+                    color: '#ffffff', transition: 'all 0.2s ease',
+                    boxShadow: '0 4px 10px rgba(37,99,235,0.3)'
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  Reserve
+                </button>
+              )}
             </div>
-          )}
+
+            {isAdmin && (
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+                <button
+                  onClick={() => navigate('/books')}
+                  disabled
+                  title="Edit functionality available from catalogue view"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                    background: '#fafafa', border: '1px solid rgba(0,0,0,0.08)',
+                    borderRadius: 10, padding: '0.65rem 1.25rem',
+                    fontWeight: 700, fontSize: '0.85rem', cursor: 'not-allowed',
+                    color: 'var(--ink-soft)', opacity: 0.6,
+                  }}
+                >
+                  <IconEdit /> Edit
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                    background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.1)',
+                    borderRadius: 10, padding: '0.65rem 1.25rem',
+                    fontWeight: 700, fontSize: '0.85rem', cursor: deleting ? 'wait' : 'pointer',
+                    color: '#dc2626', transition: 'all 0.2s ease',
+                  }}
+                >
+                  <IconTrash /> {deleting ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Detail grid */}

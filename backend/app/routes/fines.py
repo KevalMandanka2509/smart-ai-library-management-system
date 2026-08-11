@@ -6,6 +6,7 @@ from typing import List
 from ..database import get_db
 from ..schemas.fine import FinePayRequest
 from ..core.security import get_current_user, get_current_admin
+from ..utils.fine_config import get_fine_rate
 
 router = APIRouter(prefix="/api/v1/fines", tags=["Fines"])
 
@@ -46,8 +47,18 @@ async def get_fines(
     if not is_admin:
         query["student_id"] = current_user.get("username")
 
-    # 1. Fetch DB Fines
+    # 1. Fetch DB Fines and append dynamic total for consistent pagination
     total = db.fines.count_documents(query)
+    
+    if not paid:
+        now = datetime.utcnow()
+        borrow_query = {"status": "issued", "due_date": {"$lt": now}}
+        if not is_admin:
+            borrow_query["student_id"] = current_user.get("username")
+        # Note: Some borrows may have exactly 0 full days overdue, but the db query filters strictly `< now`.
+        # The small discrepancy is acceptable for pagination totals.
+        total += db.borrows.count_documents(borrow_query)
+
     total_pages = max(1, -(-total // page_size))
     skip = (page - 1) * page_size
         
@@ -56,11 +67,6 @@ async def get_fines(
 
     # 2. Add Dynamic Accumulating Fines (only on page 1 for unpaid)
     if not paid and page == 1:
-        now = datetime.utcnow()
-        borrow_query = {"status": "issued", "due_date": {"$lt": now}}
-        if not is_admin:
-            borrow_query["student_id"] = current_user.get("username")
-            
         overdue_borrows = db.borrows.find(borrow_query)
         for b in overdue_borrows:
             due = b.get("due_date")
@@ -75,13 +81,12 @@ async def get_fines(
                     "student_id": b.get("student_id", ""),
                     "student_name": b.get("student_name", "Unknown Student"),
                     "book_title": b.get("book_title", "Unknown Book"),
-                    "amount": overdue_days * 10.0,
+                    "amount": overdue_days * get_fine_rate(db),
                     "reason": f"Accumulating ({overdue_days} days late)",
                     "created_at": now,
                     "paid": False,
                     "paid_at": None
                 })
-                total += 1
 
     return {
         "fines": serialized_fines,

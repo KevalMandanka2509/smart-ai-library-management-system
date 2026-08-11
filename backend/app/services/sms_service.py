@@ -82,14 +82,14 @@ class SmsService:
         # If provider is empty or mock, log simulation and return True
         provider = config.get("provider", "").lower()
         if not provider or provider == "mock" or not config.get("api_key"):
-            logger.info(f"📱 [SMS Simulation] To: {phone} | Msg: {message}")
-            print(f"\n[SMS SIMULATION DISPATCH]\nTo: {phone}\nMessage: {message}\nProvider: MOCK/SIMULATION\n")
+            logger.info(f"📱 [SMS Simulation] To: {phone} | Msg: [REDACTED]")
+            print(f"\n[SMS SIMULATION DISPATCH]\nTo: {phone}\nMessage: [REDACTED]\nProvider: MOCK/SIMULATION\n")
             return True
 
         # Twilio, Vonage, MSG91 integration simulation using requests/httpx pattern
         try:
             logger.info(f"📱 Calling SMS Provider {provider} for {phone}")
-            print(f"\n[SMS DISPATCH VIA PROVIDER: {provider}]\nTo: {phone}\nMessage: {message}\n")
+            print(f"\n[SMS DISPATCH VIA PROVIDER: {provider}]\nTo: {phone}\nMessage: [REDACTED]\n")
             return True
         except Exception as e:
             logger.error(f"❌ Failed to dispatch SMS to {phone} via {provider}: {e}")
@@ -101,6 +101,7 @@ class SmsService:
         phone: str,
         message: str,
         template_name: str = "generic",
+        template_args: Dict[str, Any] = None,
         db=None
     ) -> bool:
         """Asynchronous non-blocking SMS dispatch with MongoDB history logging."""
@@ -111,8 +112,8 @@ class SmsService:
             try:
                 log_entry = {
                     "recipient_phone": phone,
-                    "message": message,
                     "template_name": template_name,
+                    "template_args": template_args or {},
                     "status": "sent" if success else "failed",
                     "dispatched_at": datetime.utcnow()
                 }
@@ -128,19 +129,33 @@ class SmsService:
     @classmethod
     async def send_otp_sms(cls, phone: str, db=None) -> Optional[str]:
         """Generate, save, and send a 6-digit OTP code to a phone number."""
+        
+        # Check rate limit before generating
+        if db is not None:
+            existing = db.otp_store.find_one({"phone": phone})
+            if existing and existing.get("last_sent_at"):
+                time_diff = datetime.utcnow() - existing["last_sent_at"]
+                if time_diff.total_seconds() < 60:
+                    from fastapi import HTTPException
+                    raise HTTPException(status_code=429, detail="Please wait 60 seconds before requesting another OTP.")
+
         otp_code = "".join(random.choices(string.digits, k=6))
         message = build_otp_sms(otp_code)
         
         # Save to database with 5-minute expiration
         if db is not None:
             try:
+                from ..core.security import security
+                hashed_code = security.hash_password(otp_code)
                 db.otp_store.update_one(
                     {"phone": phone},
                     {
                         "$set": {
                             "phone": phone,
-                            "code": otp_code,
-                            "expires_at": datetime.utcnow() + timedelta(minutes=5)
+                            "code": hashed_code,
+                            "expires_at": datetime.utcnow() + timedelta(minutes=5),
+                            "attempts": 0,
+                            "last_sent_at": datetime.utcnow()
                         }
                     },
                     upsert=True
@@ -149,7 +164,7 @@ class SmsService:
                 logger.error(f"Failed to store OTP: {e}")
                 return None
 
-        success = await cls.send_sms_async(phone, message, "otp_verification", db)
+        success = await cls.send_sms_async(phone, message, "otp_verification", {"otp_code": "REDACTED"}, db)
         return otp_code if success else None
 
     @classmethod
@@ -162,15 +177,26 @@ class SmsService:
             if not record:
                 return False
             
+            # Check attempt limit
+            attempts = record.get("attempts", 0)
+            if attempts >= 5:
+                db.otp_store.delete_one({"phone": phone})
+                return False
+
             # Check expiration
             expires_at = record.get("expires_at")
             if expires_at and expires_at < datetime.utcnow():
                 db.otp_store.delete_one({"phone": phone})
                 return False
 
-            if record.get("code") == code:
+            from ..core.security import security
+            db_code = record.get("code")
+            if db_code and security.verify_password(code, db_code):
                 db.otp_store.delete_one({"phone": phone})
                 return True
+            else:
+                db.otp_store.update_one({"phone": phone}, {"$inc": {"attempts": 1}})
+                return False
         except Exception as e:
             logger.error(f"Error verifying OTP: {e}")
         return False
@@ -181,34 +207,34 @@ class SmsService:
     @classmethod
     async def send_issue_confirmation(cls, phone: str, student_name: str, book_title: str, due_date: str, db=None):
         msg = build_issue_confirmation_sms(student_name, book_title, due_date)
-        await cls.send_sms_async(phone, msg, "issue_confirmation", db)
+        await cls.send_sms_async(phone, msg, "issue_confirmation", {"student_name": student_name, "book_title": book_title, "due_date": due_date}, db)
 
     @classmethod
     async def send_return_confirmation(cls, phone: str, student_name: str, book_title: str, db=None):
         msg = build_return_confirmation_sms(student_name, book_title)
-        await cls.send_sms_async(phone, msg, "return_confirmation", db)
+        await cls.send_sms_async(phone, msg, "return_confirmation", {"student_name": student_name, "book_title": book_title}, db)
 
     @classmethod
     async def send_due_reminder(cls, phone: str, student_name: str, book_title: str, due_date: str, days_overdue: int = 0, db=None):
         msg = build_due_reminder_sms(student_name, book_title, due_date, days_overdue)
-        await cls.send_sms_async(phone, msg, "due_reminder", db)
+        await cls.send_sms_async(phone, msg, "due_reminder", {"student_name": student_name, "book_title": book_title, "due_date": due_date, "days_overdue": days_overdue}, db)
 
     @classmethod
     async def send_fine_reminder(cls, phone: str, student_name: str, book_title: str, amount: float, db=None):
         msg = build_fine_alert_sms(student_name, amount, book_title)
-        await cls.send_sms_async(phone, msg, "fine_notice", db)
+        await cls.send_sms_async(phone, msg, "fine_notice", {"student_name": student_name, "book_title": book_title, "amount": amount}, db)
 
     @classmethod
     async def send_reservation_notification(cls, phone: str, student_name: str, book_title: str, status_str: str, db=None):
         msg = build_reservation_sms(student_name, book_title, status_str)
-        await cls.send_sms_async(phone, msg, "reservation_update", db)
+        await cls.send_sms_async(phone, msg, "reservation_update", {"student_name": student_name, "book_title": book_title, "status_str": status_str}, db)
 
     @classmethod
     async def send_welcome_sms(cls, phone: str, user_name: str, db=None):
         msg = build_welcome_sms(user_name)
-        await cls.send_sms_async(phone, msg, "welcome_sms", db)
+        await cls.send_sms_async(phone, msg, "welcome_sms", {"user_name": user_name}, db)
 
     @classmethod
     async def send_custom_sms(cls, phone: str, message: str, db=None):
         msg = build_custom_sms(message)
-        return await cls.send_sms_async(phone, msg, "custom_admin", db)
+        return await cls.send_sms_async(phone, msg, "custom_admin", {"message": message}, db)

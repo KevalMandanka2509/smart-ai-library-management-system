@@ -94,7 +94,27 @@ async def restore_record(
     if "_id" in original_record and isinstance(original_record["_id"], str):
         original_record["_id"] = ObjectId(original_record["_id"])
     
-    # 3. Insert back into original collection
+    # 3. Check for duplicates manually before restoring
+    import re
+    if collection == "books":
+        if db.books.find_one({"isbn": original_record.get("isbn")}):
+            raise HTTPException(status_code=400, detail="Cannot restore: A book with this ISBN already exists.")
+    elif collection == "students":
+        if db.students.find_one({"student_id": original_record.get("student_id")}):
+            raise HTTPException(status_code=400, detail="Cannot restore: A student with this ID already exists.")
+        if original_record.get("email"):
+            if db.students.find_one({"email": original_record.get("email", "").lower()}):
+                raise HTTPException(status_code=400, detail="Cannot restore: A student with this email already exists.")
+    elif collection == "authors":
+        name = original_record.get("name")
+        if db.authors.find_one({"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}, "is_deleted": {"$ne": True}}):
+            raise HTTPException(status_code=400, detail="Cannot restore: An author with this name already exists.")
+    elif collection == "categories":
+        name = original_record.get("name")
+        if db.categories.find_one({"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}, "is_deleted": {"$ne": True}}):
+            raise HTTPException(status_code=400, detail="Cannot restore: A category with this name already exists.")
+            
+    # 4. Insert back into original collection
     try:
         db[collection].insert_one(original_record)
     except DuplicateKeyError:

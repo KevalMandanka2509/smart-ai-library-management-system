@@ -253,10 +253,10 @@ async def delete_category(
             detail=f"Category with ID {category_id} not found"
         )
 
-    # Safe delete: check if any books reference this category_id
+    # Safe delete: check if any books reference this category
     books_collection = db.books
     books_with_category = books_collection.count_documents({
-        "category_id": category_id
+        "genre": category.get("name")
     })
     if books_with_category > 0:
         raise HTTPException(

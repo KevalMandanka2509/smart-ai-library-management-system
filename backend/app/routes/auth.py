@@ -18,27 +18,23 @@ async def register(request: RegisterRequest, db=Depends(get_db)):
     """
     collection = db.users
     
-    # Check if email exists
-    if collection.find_one({"email": request.email.lower()}):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
-    
-    # Check if username exists
-    if collection.find_one({"username": request.username.lower()}):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already taken"
-        )
-    
     # Create user
     user_data = request.dict()
     user_data["role"] = "member"
     user_data["password"] = security.hash_password(user_data["password"])
     new_user = user_document(user_data)
     
-    result = collection.insert_one(new_user)
+    from pymongo.errors import DuplicateKeyError
+    try:
+        result = collection.insert_one(new_user)
+    except DuplicateKeyError as e:
+        error_msg = str(e)
+        field = "Email" if "email" in error_msg else "Username"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field} already registered"
+        )
+        
     created_user = collection.find_one({"_id": result.inserted_id})
 
     # Auto-create student profile if role is member
@@ -194,6 +190,12 @@ async def refresh_token(request: RefreshTokenRequest, db=Depends(get_db)):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account is inactive or disabled"
             )
+            
+        if user.get("locked_until") and user["locked_until"] > datetime.utcnow():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is temporarily locked"
+            )
         
         tokens = create_tokens(str(user["_id"]), user["email"])
         return tokens
@@ -215,11 +217,11 @@ async def forgot_password(request: ForgotPasswordRequest, db=Depends(get_db)):
     from datetime import timedelta
     collection = db.users
     user = collection.find_one({"email": request.email.lower()})
+    
+    success_message = {"message": "If an account exists with this email, a verification code has been sent."}
+    
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User with this email does not exist"
-        )
+        return success_message
     
     otp = str(random.randint(100000, 999999))
     expiry = datetime.utcnow() + timedelta(minutes=10)
@@ -227,8 +229,9 @@ async def forgot_password(request: ForgotPasswordRequest, db=Depends(get_db)):
     collection.update_one(
         {"_id": user["_id"]},
         {"$set": {
-            "reset_otp": otp,
-            "otp_expiry": expiry
+            "reset_otp": security.hash_password(otp),
+            "otp_expiry": expiry,
+            "otp_attempts": 0
         }}
     )
     
@@ -245,9 +248,7 @@ async def forgot_password(request: ForgotPasswordRequest, db=Depends(get_db)):
         import logging
         logging.getLogger(__name__).warning(f"Password reset email warning: {email_err}")
 
-    return {
-        "message": "Verification code sent to your email"
-    }
+    return success_message
 
 # ============================================
 # 5. VERIFY OTP
@@ -256,19 +257,27 @@ async def forgot_password(request: ForgotPasswordRequest, db=Depends(get_db)):
 async def verify_otp(request: VerifyOTPRequest, db=Depends(get_db)):
     collection = db.users
     user = collection.find_one({"email": request.email.lower()})
+    
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code or email"
+        )
+        
+    if user.get("otp_attempts", 0) >= 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Too many invalid attempts. Please request a new code."
         )
     
     db_otp = user.get("reset_otp")
     db_expiry = user.get("otp_expiry")
     
-    if not db_otp or db_otp != request.otp:
+    if not db_otp or not security.verify_password(request.otp, db_otp):
+        collection.update_one({"_id": user["_id"]}, {"$inc": {"otp_attempts": 1}})
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid verification code"
+            detail="Invalid verification code or email"
         )
         
     if db_expiry and db_expiry < datetime.utcnow():
@@ -288,16 +297,24 @@ async def verify_otp(request: VerifyOTPRequest, db=Depends(get_db)):
 async def reset_password(request: ResetPasswordRequest, db=Depends(get_db)):
     collection = db.users
     user = collection.find_one({"email": request.email.lower()})
+    
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code or email"
+        )
+        
+    if user.get("otp_attempts", 0) >= 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Too many invalid attempts. Please request a new code."
         )
         
     db_otp = user.get("reset_otp")
     db_expiry = user.get("otp_expiry")
     
-    if not db_otp or db_otp != request.otp:
+    if not db_otp or not security.verify_password(request.otp, db_otp):
+        collection.update_one({"_id": user["_id"]}, {"$inc": {"otp_attempts": 1}})
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or missing verification code"
@@ -317,6 +334,7 @@ async def reset_password(request: ResetPasswordRequest, db=Depends(get_db)):
             "password": hashed,
             "reset_otp": None,
             "otp_expiry": None,
+            "otp_attempts": 0,
             "login_attempts": 0,
             "locked_until": None
         }}

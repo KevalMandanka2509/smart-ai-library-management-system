@@ -28,7 +28,6 @@ async def create_notification(db, student_id: str, title: str, message: str, n_t
         if student:
             email = student.get("email")
             
-    # 3. Simulate email transmission
     if email:
-        logger.info(f"📧 [Email Dispatch Simulation] Sending to: {email} | Subject: {title} | Body: {message}")
-        print(f"\n[EMAIL SENT] To: {email} | Subject: {title} | Body: {message}\n")
+        logger.info(f"📧 [Email Dispatch Simulation] Sending to: {email} | Subject: {title} | Body: [REDACTED]")
+        print(f"\n[EMAIL SENT] To: {email} | Subject: {title} | Body: [REDACTED]\n")

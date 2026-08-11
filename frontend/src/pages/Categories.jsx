@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../services/api';
+import { Layers, FileText, Settings, X, AlertTriangle } from 'lucide-react';
 import './Categories.css';
 
 const Categories = () => {
@@ -133,34 +135,40 @@ const Categories = () => {
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
   return (
-    <div className="categories-page">
-      <div className="page-header" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>Category Management</h1>
-        <button className="add-btn" onClick={handleAdd}>Add New Category</button>
+    <div className="premium-page-wrapper">
+      <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
+        <PageHeader
+          title="Category Management"
+          actions={
+            <button className="add-btn" onClick={handleAdd}>Add New Category</button>
+          }
+        />
       </div>
 
-      {/* Filters Panel */}
+      {/* Advanced Filters Panel */}
       <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.5)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: 'var(--shadow-soft)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center' }}>
-          <div className="search-bar" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fffdf9', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', boxShadow: 'none', width: '100%', marginBottom: 0 }}>
-            <input
-              type="text"
-              placeholder="Search by name..."
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.95rem' }}
-            />
+          <div>
+            <div className="premium-input-wrapper no-icon">
+              <input
+                type="text"
+                placeholder="Search by name..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
           </div>
           <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', background: '#fffdf9', color: 'var(--ink)', fontSize: '0.9rem', outline: 'none' }}
-            >
-              <option value="">All Statuses</option>
-              <option value="active">Active Only</option>
-              <option value="inactive">Inactive Only</option>
-            </select>
+            <div className="premium-input-wrapper no-icon">
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+              >
+                <option value="">All Statuses</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -233,74 +241,125 @@ const Categories = () => {
       )}
 
       {/* Add/Edit Category Modal */}
-      {showForm && (
-        <div className="category-modal-overlay" onClick={handleFormClose}>
-          <div className="category-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{editingCategory ? 'Edit Category' : 'Add New Category'}</h2>
-            {formError && <div className="form-error">{formError}</div>}
-            <form onSubmit={handleFormSubmit}>
-              <div className="category-form-group">
-                <label>Category Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Enter category name"
-                  required
-                />
+      {showForm && createPortal(
+        <div className="modal-overlay">
+          <div className="modal-container modal-container-sm">
+            <div className="modal-header">
+              <div className="modal-title-area">
+                <div className="modal-icon-wrapper">
+                  <Layers size={24} />
+                </div>
+                <div>
+                  <h2>{editingCategory ? 'Edit Category' : 'Add New Category'}</h2>
+                  <div className="modal-subtitle">
+                    {editingCategory ? 'Modify category details' : 'Create a new book category'}
+                  </div>
+                </div>
               </div>
-              <div className="category-form-group">
-                <label>Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Brief description of the category..."
-                  rows={4}
-                />
-              </div>
-              <div className="category-form-group">
-                <label>Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-              <div className="category-form-actions">
-                <button type="button" className="cancel-btn" onClick={handleFormClose}>Cancel</button>
-                <button type="submit" className="save-btn" disabled={formSaving}>
-                  {formSaving ? 'Saving...' : (editingCategory ? 'Update Category' : 'Add Category')}
-                </button>
-              </div>
-            </form>
+              <button className="modal-close-btn" onClick={handleFormClose} title="Close">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {formError && (
+                <div style={{ marginBottom: '1.25rem', padding: '0.8rem 1rem', background: '#fef2f2', border: '1px solid #fee2e2', color: '#b91c1c', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
+                  {formError}
+                  <button type="button" style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }} onClick={() => setFormError('')}>✕</button>
+                </div>
+              )}
+              <form id="category-form" onSubmit={handleFormSubmit}>
+                <div className="premium-form-group" style={{ marginBottom: '1rem' }}>
+                  <label>Category Name *</label>
+                  <div className="premium-input-wrapper">
+                    <Layers className="premium-input-icon" size={16} />
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="e.g. Science Fiction"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="premium-form-group" style={{ marginBottom: '1rem' }}>
+                  <label>Description</label>
+                  <div className="premium-input-wrapper" style={{ alignItems: 'flex-start' }}>
+                    <FileText className="premium-input-icon" size={16} style={{ top: '0.75rem' }} />
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Brief description of the category..."
+                      rows={4}
+                      style={{ resize: 'none' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="premium-form-group">
+                  <label>Status</label>
+                  <div className="premium-input-wrapper no-icon">
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="modal-btn modal-btn-cancel" onClick={handleFormClose}>Cancel</button>
+              <button type="submit" form="category-form" className="modal-btn modal-btn-save" disabled={formSaving}>
+                {formSaving ? 'Saving...' : (editingCategory ? 'Update Category' : 'Add Category')}
+              </button>
+            </div>
           </div>
-        </div>
+        </div>, document.body
       )}
 
       {/* Delete Confirmation Modal */}
-      {deleteTarget && (
-        <div className="category-modal-overlay" onClick={handleDeleteCancel}>
-          <div className="category-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
-            <div className="delete-confirm-content">
-              <div className="delete-icon">⚠️</div>
-              <h3>Delete Category</h3>
-              <p>Are you sure you want to delete <strong>"{deleteTarget.name}"</strong>?</p>
-              <p className="warning-text">This action will soft-delete the category. Books referencing this category must be reassigned first.</p>
-              {deleteError && <div className="form-error" style={{ marginTop: '1rem', textAlign: 'left' }}>{deleteError}</div>}
+      {deleteTarget && createPortal(
+        <div className="modal-overlay">
+          <div className="modal-container modal-container-sm">
+            <div className="modal-header">
+              <div className="modal-title-area">
+                <div className="modal-icon-wrapper" style={{ background: '#fef2f2', color: '#ef4444' }}>
+                  <AlertTriangle size={24} />
+                </div>
+                <div>
+                  <h2 style={{ color: '#b91c1c' }}>Delete Category</h2>
+                </div>
+              </div>
             </div>
-            <div className="delete-confirm-actions">
-              <button className="cancel-delete-btn" onClick={handleDeleteCancel}>Cancel</button>
-              <button className="confirm-delete-btn" onClick={handleDeleteConfirm} disabled={deleteLoading}>
+            
+            <div className="modal-body" style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
+              <p style={{ fontSize: '1.05rem', color: 'var(--ink)' }}>Are you sure you want to delete <strong>"{deleteTarget.name}"</strong>?</p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--ink-soft)', marginTop: '0.5rem' }}>This action will soft-delete the category. Books referencing this category must be reassigned first.</p>
+              
+              {deleteError && (
+                <div style={{ marginTop: '1rem', padding: '0.8rem', background: '#fef2f2', border: '1px solid #fee2e2', color: '#b91c1c', borderRadius: '8px', fontSize: '0.85rem' }}>
+                  {deleteError}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ justifyContent: 'center' }}>
+              <button className="modal-btn modal-btn-cancel" onClick={handleDeleteCancel}>Cancel</button>
+              <button className="modal-btn modal-btn-save" style={{ background: '#ef4444', boxShadow: '0 4px 12px rgba(239,68,68,0.2)' }} onClick={handleDeleteConfirm} disabled={deleteLoading}>
                 {deleteLoading ? 'Deleting...' : 'Yes, Delete'}
               </button>
             </div>
           </div>
-        </div>
+        </div>, document.body
       )}
     </div>
   );
 };
 
 export default Categories;
+

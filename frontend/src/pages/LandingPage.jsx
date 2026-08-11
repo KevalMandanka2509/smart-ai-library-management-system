@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { api } from '../services/api';
 import libraryShelf from '../assets/library-shelf.webp';
 import './LandingPage.css';
 
@@ -221,21 +222,20 @@ const LandingPage = () => {
             <div style={{ background: '#fdfcf9', padding: '2.5rem', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
               <form onSubmit={async (e) => {
                 e.preventDefault();
+                const btn = e.target.querySelector('button[type="submit"]');
+                if (btn.disabled) return;
+                btn.disabled = true;
+                btn.textContent = 'Sending...';
                 const formData = new FormData(e.target);
                 try {
-                    const response = await fetch('http://127.0.0.1:8000/api/v1/contact/', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(Object.fromEntries(formData))
-                    });
-                    if (response.ok) {
-                        alert('Message sent successfully!');
-                        e.target.reset();
-                    } else {
-                        alert('Failed to send message.');
-                    }
+                    await api.post('/contact/', Object.fromEntries(formData));
+                    alert('Message sent successfully!');
+                    e.target.reset();
                 } catch(err) {
                     alert('Error sending message.');
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Send Message';
                 }
               }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>

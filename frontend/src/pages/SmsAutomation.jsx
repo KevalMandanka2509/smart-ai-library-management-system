@@ -84,7 +84,10 @@ const SmsAutomation = () => {
       setLogsLoading(true);
       const data = await getSmsHistory(200, searchQuery);
       setLogs(Array.isArray(data) ? data : []);
-    } catch { setLogs([]); }
+    } catch { 
+      setLogs([]); 
+      setError('Failed to fetch SMS history logs.');
+    }
     finally { setLogsLoading(false); }
   }, [searchQuery]);
 
@@ -93,7 +96,10 @@ const SmsAutomation = () => {
       setTemplatesLoading(true);
       const data = await getSmsTemplates();
       setTemplates(Array.isArray(data) ? data : []);
-    } catch { setTemplates([]); }
+    } catch { 
+      setTemplates([]); 
+      setError('Failed to fetch templates.');
+    }
     finally { setTemplatesLoading(false); }
   }, []);
 
@@ -270,14 +276,14 @@ const SmsAutomation = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="sms-tab-nav">
+      <div className="premium-tab-container" style={{ marginBottom: '2rem' }}>
         {tabs.map(tab => (
           <button
             key={tab.id}
-            className={`sms-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+            className={`premium-tab ${activeTab === tab.id ? 'active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
-            <span className="sms-tab-icon">{tab.icon}</span>
+            <span style={{ marginRight: '0.5rem' }}>{tab.icon}</span>
             {tab.label}
           </button>
         ))}
@@ -291,9 +297,8 @@ const SmsAutomation = () => {
           <h3 className="sms-section-title">📋 SMS Dispatch Logs</h3>
           <p className="sms-section-subtitle">Real-time delivery transaction logs.</p>
 
-          <div className="sms-history-toolbar">
-            <div className="sms-search-box">
-              <span className="sms-search-icon">🔍</span>
+          <div className="sms-history-toolbar" style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <div className="premium-input-wrapper no-icon" style={{ flex: '1', maxWidth: '300px' }}>
               <input
                 type="text"
                 placeholder="Search by phone, message, or template..."
@@ -694,3 +699,4 @@ const SmsAutomation = () => {
 };
 
 export default SmsAutomation;
+

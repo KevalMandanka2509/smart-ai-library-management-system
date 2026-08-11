@@ -40,7 +40,11 @@ const LoginPage = ({ onLoginSuccess }) => {
         }
       }
 
-      navigate('/dashboard');
+      if (data.user && data.user.role === 'librarian') {
+        navigate('/librarian');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       if (err.code === 'ECONNABORTED' || !err.response) {
         setError('Network error or server is unresponsive. Please try again.');

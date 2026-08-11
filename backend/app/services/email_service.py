@@ -271,13 +271,13 @@ class EmailService:
             return False
 
     @classmethod
-    @classmethod
     async def send_email_async(
         cls,
         recipient_email: str,
         subject: str,
         html_body: str,
         template_name: str = "generic",
+        template_args: Dict[str, Any] = None,
         db=None
     ) -> bool:
         """Asynchronous non-blocking email dispatch with MongoDB history logging."""
@@ -291,7 +291,7 @@ class EmailService:
                     "recipient_email": recipient_email,
                     "subject": subject,
                     "template_name": template_name,
-                    "body": html_body,
+                    "template_args": template_args or {},
                     "status": "sent" if success else "failed",
                     "dispatched_at": datetime.utcnow()
                 }
@@ -304,45 +304,45 @@ class EmailService:
     @classmethod
     async def send_issue_confirmation(cls, recipient_email: str, student_name: str, book_title: str, issue_date: str, due_date: str, db=None):
         html = build_issue_confirmation_html(student_name, book_title, issue_date, due_date)
-        await cls.send_email_async(recipient_email, f"Book Issued: {book_title}", html, "issue_confirmation", db)
+        await cls.send_email_async(recipient_email, f"Book Issued: {book_title}", html, "issue_confirmation", {"student_name": student_name, "book_title": book_title, "issue_date": issue_date, "due_date": due_date}, db)
 
     @classmethod
     async def send_return_confirmation(cls, recipient_email: str, student_name: str, book_title: str, return_date: str, db=None):
         html = build_return_confirmation_html(student_name, book_title, return_date)
-        await cls.send_email_async(recipient_email, f"Book Returned: {book_title}", html, "return_confirmation", db)
+        await cls.send_email_async(recipient_email, f"Book Returned: {book_title}", html, "return_confirmation", {"student_name": student_name, "book_title": book_title, "return_date": return_date}, db)
 
     @classmethod
     async def send_due_reminder(cls, recipient_email: str, student_name: str, book_title: str, due_date: str, days_overdue: int = 0, db=None):
         subject = f"Overdue Notice: {book_title}" if days_overdue > 0 else f"Due Reminder: {book_title}"
         html = build_due_reminder_html(student_name, book_title, due_date, days_overdue)
-        await cls.send_email_async(recipient_email, subject, html, "due_reminder", db)
+        await cls.send_email_async(recipient_email, subject, html, "due_reminder", {"student_name": student_name, "book_title": book_title, "due_date": due_date, "days_overdue": days_overdue}, db)
 
     @classmethod
     async def send_fine_reminder(cls, recipient_email: str, student_name: str, book_title: str, amount: float, reason: str, db=None):
         html = build_fine_reminder_html(student_name, book_title, amount, reason)
-        await cls.send_email_async(recipient_email, f"Fine Notice: ₹{amount:.2f} - {book_title}", html, "fine_notice", db)
+        await cls.send_email_async(recipient_email, f"Fine Notice: ₹{amount:.2f} - {book_title}", html, "fine_notice", {"student_name": student_name, "book_title": book_title, "amount": amount, "reason": reason}, db)
 
     @classmethod
     async def send_reservation_notification(cls, recipient_email: str, student_name: str, book_title: str, status_str: str, db=None):
         html = build_reservation_notification_html(student_name, book_title, status_str)
-        await cls.send_email_async(recipient_email, f"Reservation Update: {book_title}", html, "reservation_update", db)
+        await cls.send_email_async(recipient_email, f"Reservation Update: {book_title}", html, "reservation_update", {"student_name": student_name, "book_title": book_title, "status_str": status_str}, db)
 
     @classmethod
     async def send_welcome_email(cls, recipient_email: str, user_name: str, username: str, user_role: str, db=None):
         html = build_welcome_email_html(user_name, username, user_role)
-        await cls.send_email_async(recipient_email, "Welcome to Smart AI Library System", html, "welcome_email", db)
+        await cls.send_email_async(recipient_email, "Welcome to Smart AI Library System", html, "welcome_email", {"user_name": user_name, "username": username, "user_role": user_role}, db)
 
     @classmethod
     async def send_password_reset_email(cls, recipient_email: str, user_name: str, otp_code: str, db=None):
         html = build_password_reset_html(user_name, otp_code)
-        await cls.send_email_async(recipient_email, "Password Reset OTP Verification Code", html, "password_reset", db)
+        await cls.send_email_async(recipient_email, "Password Reset OTP Verification Code", html, "password_reset", {"user_name": user_name, "otp_code": "REDACTED"}, db)
 
     @classmethod
     async def send_custom_email(cls, recipient_email: str, subject: str, message_body: str, db=None):
         html = build_custom_email_html(subject, message_body)
-        return await cls.send_email_async(recipient_email, subject, html, "custom_admin", db)
+        return await cls.send_email_async(recipient_email, subject, html, "custom_admin", {"subject": subject, "message_body": message_body}, db)
 
     @classmethod
     async def send_test_email(cls, recipient_email: str, db=None) -> bool:
         html = build_test_email_html(recipient_email)
-        return await cls.send_email_async(recipient_email, "Smart AI Library: SMTP Connection Test", html, "smtp_test", db)
+        return await cls.send_email_async(recipient_email, "Smart AI Library: SMTP Connection Test", html, "smtp_test", {"recipient_email": recipient_email}, db)

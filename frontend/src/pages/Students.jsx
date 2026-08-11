@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getStudents, deleteStudent, searchStudents, bulkDeleteStudents, exportStudentsCsvUrl, importStudentsCsv } from '../services/api';
+import { createPortal } from 'react-dom';
+import { Download, Upload, Filter, Mail, Trash2 } from 'lucide-react';
+import { getStudents, deleteStudent, searchStudents, bulkDeleteStudents, exportStudentsCsv, importStudentsCsv, getStudentStats } from '../services/api';
 import StudentForm from '../components/Students/StudentForm';
 import StudentDetails from '../components/Students/StudentDetails';
 import { PageHeader, StatusBadge, EmptyState, LoadingSkeleton } from '../components/layout/EnterpriseLibrary';
@@ -44,46 +46,42 @@ const Students = () => {
   const [departments, setDepartments] = useState([]);
 
   useEffect(() => {
+    loadStats();
+  }, []);
+
+  useEffect(() => {
     loadStudentsList();
   }, [searchTerm, selectedCourse, selectedDept, statusFilter, currentPage]);
+
+  const loadStats = async () => {
+    try {
+      const stats = await getStudentStats();
+      setCourses(stats.by_course.map(c => c.course).filter(c => c !== 'Not Assigned'));
+      setDepartments(stats.by_department.map(d => d.department).filter(d => d !== 'Not Assigned'));
+    } catch(err) {}
+  };
 
   const loadStudentsList = async () => {
     try {
       setLoading(true);
       setError('');
 
-      let data = [];
-      if (searchTerm.trim()) {
-        data = await searchStudents({ query: searchTerm });
-      } else {
-        data = await getStudents();
-      }
-
-      // Populate filters list dynamically
-      const uniqueCourses = [...new Set(data.map(s => s.course).filter(Boolean))];
-      const uniqueDepts = [...new Set(data.map(s => s.department).filter(Boolean))];
-      setCourses(uniqueCourses);
-      setDepartments(uniqueDepts);
-
-      // Perform client filtering based on other params
-      let filtered = [...data];
-      if (selectedCourse) {
-        filtered = filtered.filter(s => s.course === selectedCourse);
-      }
-      if (selectedDept) {
-        filtered = filtered.filter(s => s.department === selectedDept);
-      }
-      if (statusFilter) {
-        const activeFlag = statusFilter === 'active';
-        filtered = filtered.filter(s => s.is_active === activeFlag);
-      }
-
-      setTotalStudentsCount(filtered.length);
-
-      // Pagination slice
       const startIndex = (currentPage - 1) * pageSize;
-      const paginated = filtered.slice(startIndex, startIndex + pageSize);
-      setStudents(paginated);
+      const params = {
+        skip: startIndex,
+        limit: pageSize,
+      };
+
+      if (searchTerm.trim()) params.query = searchTerm.trim();
+      if (selectedCourse) params.course = selectedCourse;
+      if (selectedDept) params.department = selectedDept;
+      if (statusFilter) params.is_active = statusFilter === 'active';
+
+      // Always use searchStudents since it supports all filters
+      const response = await searchStudents(params);
+      
+      setStudents(response.students);
+      setTotalStudentsCount(response.total);
 
     } catch (err) {
       setError('Failed to load students list.');
@@ -115,14 +113,21 @@ const Students = () => {
     }
   };
 
-  const handleCsvExport = () => {
-    const exportUrl = exportStudentsCsvUrl();
-    const a = document.createElement('a');
-    a.href = exportUrl;
-    a.download = 'library_students_export.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const handleCsvExport = async () => {
+    try {
+      const blob = await exportStudentsCsv();
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'library_students_export.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export students", err);
+      alert("Failed to export students");
+    }
   };
 
   const handleCsvImport = async (e) => {
@@ -189,12 +194,8 @@ const Students = () => {
     );
   }
 
-  if (showForm) {
-    return <StudentForm student={editingStudent} onSave={handleFormClose} onCancel={handleFormClose} />;
-  }
-
   return (
-    <div className="students-page">
+    <div className="premium-page-wrapper">
       {/* ── PageHeader Component Migration ── */}
       <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
         <PageHeader
@@ -226,48 +227,52 @@ const Students = () => {
       {/* Advanced Filters Panel */}
       <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.5)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: 'var(--shadow-soft)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center' }}>
-          <div className="search-bar" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fffdf9', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', boxShadow: 'none', width: '100%', marginBottom: 0 }}>
-            <input
-              type="text"
-              placeholder="Search by name, ID, email..."
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.95rem' }}
-            />
+          <div>
+            <div className="premium-input-wrapper no-icon">
+              <input
+                type="text"
+                placeholder="Search by name, ID, email..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
           </div>
 
           <div>
-            <select
-              value={selectedCourse}
-              onChange={(e) => { setSelectedCourse(e.target.value); setCurrentPage(1); }}
-              style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', background: '#fffdf9', color: 'var(--ink)', fontSize: '0.9rem', outline: 'none' }}
-            >
-              <option value="">All Courses</option>
-              {courses.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <div className="premium-input-wrapper no-icon">
+              <select
+                value={selectedCourse}
+                onChange={(e) => { setSelectedCourse(e.target.value); setCurrentPage(1); }}
+              >
+                <option value="">All Courses</option>
+                {courses.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
           </div>
 
           <div>
-            <select
-              value={selectedDept}
-              onChange={(e) => { setSelectedDept(e.target.value); setCurrentPage(1); }}
-              style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', background: '#fffdf9', color: 'var(--ink)', fontSize: '0.9rem', outline: 'none' }}
-            >
-              <option value="">All Departments</option>
-              {departments.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
+            <div className="premium-input-wrapper no-icon">
+              <select
+                value={selectedDept}
+                onChange={(e) => { setSelectedDept(e.target.value); setCurrentPage(1); }}
+              >
+                <option value="">All Departments</option>
+                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
           </div>
 
           <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', background: '#fffdf9', color: 'var(--ink)', fontSize: '0.9rem', outline: 'none' }}
-            >
-              <option value="">All Statuses</option>
-              <option value="active">Active Only</option>
-              <option value="inactive">Inactive Only</option>
-            </select>
+            <div className="premium-input-wrapper no-icon">
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+              >
+                <option value="">All Statuses</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -377,6 +382,15 @@ const Students = () => {
             </div>
           )}
         </>
+      )}
+
+      {showForm && createPortal(
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <StudentForm student={editingStudent} onSave={handleFormClose} onCancel={handleFormClose} />
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

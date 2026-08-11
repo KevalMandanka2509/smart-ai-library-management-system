@@ -65,7 +65,7 @@ const Fines = () => {
   };
 
   return (
-    <div className="dashboard-wrapper" style={{ padding: '2rem' }}>
+    <div className="premium-page-wrapper" style={{ padding: '2rem' }}>
       {/* ── PageHeader Component Migration ── */}
       <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
         <PageHeader
@@ -87,34 +87,16 @@ const Fines = () => {
       )}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1.5px solid rgba(226,211,179,0.25)', paddingBottom: '1rem' }}>
+      <div className="premium-tab-container">
         <button
           onClick={() => setActiveTab('unpaid')}
-          style={{
-            background: activeTab === 'unpaid' ? 'linear-gradient(135deg, #e4a81e, #b88610)' : 'transparent',
-            color: activeTab === 'unpaid' ? '#ffffff' : 'var(--ink)',
-            border: activeTab === 'unpaid' ? 'none' : '1px solid rgba(212,160,23,0.3)',
-            padding: '0.6rem 1.5rem',
-            borderRadius: '8px',
-            fontWeight: '700',
-            cursor: 'pointer',
-            transition: 'all 0.25s ease'
-          }}
+          className={`premium-tab ${activeTab === 'unpaid' ? 'active' : ''}`}
         >
           Outstanding Fines
         </button>
         <button
           onClick={() => setActiveTab('paid')}
-          style={{
-            background: activeTab === 'paid' ? 'linear-gradient(135deg, #e4a81e, #b88610)' : 'transparent',
-            color: activeTab === 'paid' ? '#ffffff' : 'var(--ink)',
-            border: activeTab === 'paid' ? 'none' : '1px solid rgba(212,160,23,0.3)',
-            padding: '0.6rem 1.5rem',
-            borderRadius: '8px',
-            fontWeight: '700',
-            cursor: 'pointer',
-            transition: 'all 0.25s ease'
-          }}
+          className={`premium-tab ${activeTab === 'paid' ? 'active' : ''}`}
         >
           Payment History
         </button>
@@ -192,3 +174,4 @@ const Fines = () => {
 };
 
 export default Fines;
+

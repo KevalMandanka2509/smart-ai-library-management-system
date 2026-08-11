@@ -3,6 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { searchBooksAdvanced, searchStudentsAdvanced, getGenres } from '../services/api';
 import './books.css';
 import './Dashboard.css';
+import { Search, SlidersHorizontal, X, Book, GraduationCap } from 'lucide-react';
+import { PageHeader } from '../components/layout/EnterpriseLibrary';
+import '../styles/design-tokens.css';
 
 // ─────────────────────────────────────────────────────────────
 // Highlight helper: wraps matched substring in <mark>
@@ -316,47 +319,39 @@ const AdvancedSearch = () => {
 
   const highlightTerm = query || title || isbn || author || publisher || genre;
 
-  const inputStyle = {
-    width: '100%', padding: '0.55rem 0.85rem',
-    border: '1.5px solid rgba(226,211,179,0.7)', borderRadius: '8px',
-    background: '#fdfcf9', fontSize: '0.875rem', outline: 'none',
-    color: '#1e1b15', boxSizing: 'border-box'
-  };
+  
 
   return (
     <div className="books-page">
       {/* ── Header ── */}
-      <div className="page-header">
-        <div>
-          <h1 style={{ marginBottom: '0.2rem' }}>Advanced Search</h1>
-          <p style={{ color: '#5c5549', fontSize: '0.9rem', margin: 0 }}>
-            Search across books, authors, ISBN, categories, publishers{isAdmin ? ', and students' : ''}
-          </p>
-        </div>
+      <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
+        <PageHeader 
+          title="Advanced Search" 
+          subtitle={isAdmin ? 'Search across books, authors, ISBN, categories, publishers, and students' : 'Search across books, authors, ISBN, categories, publishers'}
+          actions={<div />} 
+        />
       </div>
 
       {/* ── Main search bar ── */}
-      <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.5)', borderRadius: '16px', padding: '1.25rem 1.5rem', marginBottom: '1.5rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
+      <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.5)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: 'var(--shadow-soft)' }}>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"
-              style={{ position: 'absolute', left: '0.9rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
+          <div className="premium-input-wrapper" style={{ flex: 1, margin: 0 }}>
+            <Search className="premium-input-icon" size={20} />
             <input
               id="adv-search-input"
               type="text"
               value={query}
               onChange={e => { setQuery(e.target.value); resetBookPage(); resetStuPage(); }}
               placeholder="Search by title, author, ISBN, publisher, category…"
-              style={{ ...inputStyle, paddingLeft: '2.5rem', fontSize: '1rem', padding: '0.75rem 1rem 0.75rem 2.5rem' }}
               autoFocus
             />
             {query && (
               <button onClick={() => setQuery('')} style={{
-                position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
-                background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '1.2rem', lineHeight: 1
-              }}>×</button>
+                position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex'
+              }}>
+                <X size={18} />
+              </button>
             )}
           </div>
           <button
@@ -369,9 +364,7 @@ const AdvancedSearch = () => {
               display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap'
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-            </svg>
+            <SlidersHorizontal size={16} />
             Filters {activeBookFilters.length > 0 && `(${activeBookFilters.length})`}
           </button>
           {(query || activeBookFilters.length > 0) && (
@@ -391,43 +384,59 @@ const AdvancedSearch = () => {
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem', marginBottom: '1rem' }}>
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', display: 'block', marginBottom: '0.3rem' }}>Title</label>
-                <input value={title} onChange={e => { setTitle(e.target.value); resetBookPage(); }} placeholder="Exact title…" style={inputStyle} />
+                <label className="premium-label">Title</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input value={title} onChange={e => { setTitle(e.target.value); resetBookPage(); }} placeholder="Exact title…" />
+                </div>
               </div>
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', display: 'block', marginBottom: '0.3rem' }}>ISBN</label>
-                <input value={isbn} onChange={e => { setIsbn(e.target.value); resetBookPage(); }} placeholder="ISBN…" style={inputStyle} />
+                <label className="premium-label">ISBN</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input value={isbn} onChange={e => { setIsbn(e.target.value); resetBookPage(); }} placeholder="ISBN…" />
+                </div>
               </div>
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', display: 'block', marginBottom: '0.3rem' }}>Author</label>
-                <input value={author} onChange={e => { setAuthor(e.target.value); resetBookPage(); }} placeholder="Author name…" style={inputStyle} />
+                <label className="premium-label">Author</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input value={author} onChange={e => { setAuthor(e.target.value); resetBookPage(); }} placeholder="Author name…" />
+                </div>
               </div>
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', display: 'block', marginBottom: '0.3rem' }}>Publisher</label>
-                <input value={publisher} onChange={e => { setPublisher(e.target.value); resetBookPage(); }} placeholder="Publisher…" style={inputStyle} />
+                <label className="premium-label">Publisher</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input value={publisher} onChange={e => { setPublisher(e.target.value); resetBookPage(); }} placeholder="Publisher…" />
+                </div>
               </div>
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', display: 'block', marginBottom: '0.3rem' }}>Category</label>
-                <select value={genre} onChange={e => { setGenre(e.target.value); resetBookPage(); }} style={inputStyle}>
-                  <option value="">All Categories</option>
-                  {genres.map(g => <option key={g} value={g}>{g}</option>)}
-                </select>
+                <label className="premium-label">Category</label>
+                <div className="premium-input-wrapper no-icon">
+                  <select value={genre} onChange={e => { setGenre(e.target.value); resetBookPage(); }}>
+                    <option value="">All Categories</option>
+                    {genres.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
               </div>
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', display: 'block', marginBottom: '0.3rem' }}>Availability</label>
-                <select value={availability} onChange={e => { setAvailability(e.target.value); resetBookPage(); }} style={inputStyle}>
-                  <option value="">All</option>
-                  <option value="true">Available</option>
-                  <option value="false">Unavailable</option>
-                </select>
+                <label className="premium-label">Availability</label>
+                <div className="premium-input-wrapper no-icon">
+                  <select value={availability} onChange={e => { setAvailability(e.target.value); resetBookPage(); }}>
+                    <option value="">All</option>
+                    <option value="true">Available</option>
+                    <option value="false">Unavailable</option>
+                  </select>
+                </div>
               </div>
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', display: 'block', marginBottom: '0.3rem' }}>Year From</label>
-                <input type="number" value={yearFrom} onChange={e => { setYearFrom(e.target.value); resetBookPage(); }} placeholder="e.g. 2000" style={inputStyle} min="1000" max="2100" />
+                <label className="premium-label">Year From</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input type="number" value={yearFrom} onChange={e => { setYearFrom(e.target.value); resetBookPage(); }} placeholder="e.g. 2000" min="1000" max="2100" />
+                </div>
               </div>
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', display: 'block', marginBottom: '0.3rem' }}>Year To</label>
-                <input type="number" value={yearTo} onChange={e => { setYearTo(e.target.value); resetBookPage(); }} placeholder="e.g. 2024" style={inputStyle} min="1000" max="2100" />
+                <label className="premium-label">Year To</label>
+                <div className="premium-input-wrapper no-icon">
+                  <input type="number" value={yearTo} onChange={e => { setYearTo(e.target.value); resetBookPage(); }} placeholder="e.g. 2024" min="1000" max="2100" />
+                </div>
               </div>
             </div>
 
@@ -438,24 +447,32 @@ const AdvancedSearch = () => {
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem' }}>
                   <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', display: 'block', marginBottom: '0.3rem' }}>Student ID</label>
-                    <input value={studentId} onChange={e => { setStudentId(e.target.value); resetStuPage(); }} placeholder="STU-…" style={inputStyle} />
+                    <label className="premium-label">Student ID</label>
+                    <div className="premium-input-wrapper no-icon">
+                      <input value={studentId} onChange={e => { setStudentId(e.target.value); resetStuPage(); }} placeholder="STU-…" />
+                    </div>
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', display: 'block', marginBottom: '0.3rem' }}>Course</label>
-                    <input value={course} onChange={e => { setCourse(e.target.value); resetStuPage(); }} placeholder="Course…" style={inputStyle} />
+                    <label className="premium-label">Course</label>
+                    <div className="premium-input-wrapper no-icon">
+                      <input value={course} onChange={e => { setCourse(e.target.value); resetStuPage(); }} placeholder="Course…" />
+                    </div>
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', display: 'block', marginBottom: '0.3rem' }}>Department</label>
-                    <input value={department} onChange={e => { setDepartment(e.target.value); resetStuPage(); }} placeholder="Department…" style={inputStyle} />
+                    <label className="premium-label">Department</label>
+                    <div className="premium-input-wrapper no-icon">
+                      <input value={department} onChange={e => { setDepartment(e.target.value); resetStuPage(); }} placeholder="Department…" />
+                    </div>
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', display: 'block', marginBottom: '0.3rem' }}>Status</label>
-                    <select value={studentActive} onChange={e => { setStudentActive(e.target.value); resetStuPage(); }} style={inputStyle}>
-                      <option value="">All</option>
-                      <option value="true">Active</option>
-                      <option value="false">Inactive</option>
-                    </select>
+                    <label className="premium-label">Status</label>
+                    <div className="premium-input-wrapper no-icon">
+                      <select value={studentActive} onChange={e => { setStudentActive(e.target.value); resetStuPage(); }}>
+                        <option value="">All</option>
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </>
@@ -475,18 +492,23 @@ const AdvancedSearch = () => {
 
       {/* ── Tabs ── */}
       {isAdmin && (
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-          {[['books', 'Books', bookResult?.total], ['students', 'Students', stuResult?.total]].map(([tab, label, count]) => (
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '2px solid rgba(226,211,179,0.3)' }}>
+          {[
+            ['books', 'Books', bookResult?.total, Book],
+            ['students', 'Students', stuResult?.total, GraduationCap]
+          ].map(([tab, label, count, Icon]) => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{
-              padding: '0.55rem 1.2rem', borderRadius: '8px', border: 'none',
-              background: activeTab === tab ? '#D4A017' : '#f1f5f9',
-              color: activeTab === tab ? '#fff' : '#5c5549',
-              fontWeight: '700', fontSize: '0.875rem', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '0.4rem'
+              padding: '0.75rem 1.5rem', border: 'none', background: 'transparent',
+              color: activeTab === tab ? 'var(--gold-dark)' : '#9ca3af',
+              fontWeight: '700', fontSize: '0.95rem', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              borderBottom: activeTab === tab ? '3px solid var(--gold)' : '3px solid transparent',
+              marginBottom: '-2px', transition: 'all 0.2s ease'
             }}>
+              <Icon size={18} />
               {label}
               {count !== undefined && (
-                <span style={{ background: activeTab === tab ? 'rgba(255,255,255,0.3)' : '#d1d5db', borderRadius: '999px', padding: '0.05rem 0.4rem', fontSize: '0.72rem' }}>
+                <span style={{ background: activeTab === tab ? 'rgba(212,160,23,0.15)' : '#f1f5f9', borderRadius: '999px', padding: '0.1rem 0.5rem', fontSize: '0.75rem', color: activeTab === tab ? 'var(--gold-dark)' : '#6b7280' }}>
                   {count}
                 </span>
               )}
@@ -626,3 +648,5 @@ const AdvancedSearch = () => {
 };
 
 export default AdvancedSearch;
+
+

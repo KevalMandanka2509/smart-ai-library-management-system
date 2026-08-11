@@ -62,17 +62,33 @@ class SystemSettingsSchema(BaseModel):
     branding: Optional[Dict[str, Any]] = None
 
 @router.get("/")
-async def get_system_settings(db=Depends(get_db)):
+async def get_system_settings(
+    db=Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    # Filter sensitive data based on role
+    role = "member"
+    if current_user:
+        role = current_user.get("role", "member")
+
     record = db.settings.find_one({"_id": "global_config"})
     if not record:
         db.settings.insert_one({"_id": "global_config", **DEFAULT_SETTINGS})
-        return DEFAULT_SETTINGS
-    
-    # Merge with defaults in case of missing keys
-    merged = {**DEFAULT_SETTINGS}
-    for category in DEFAULT_SETTINGS:
-        if category in record and isinstance(record[category], dict):
-            merged[category] = {**DEFAULT_SETTINGS[category], **record[category]}
+        merged = {**DEFAULT_SETTINGS}
+    else:
+        # Merge with defaults in case of missing keys
+        merged = {**DEFAULT_SETTINGS}
+        for category in DEFAULT_SETTINGS:
+            if category in record and isinstance(record[category], dict):
+                merged[category] = {**DEFAULT_SETTINGS[category], **record[category]}
+                
+    if role not in ["admin", "librarian"]:
+        # Sanitize sensitive configs for regular members
+        if "email" in merged:
+            merged.pop("email")
+        if "branding" in merged:
+            merged.pop("branding")
+            
     return merged
 
 @router.put("/")

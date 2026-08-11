@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { browseBooks, getGenres, bulkDeleteBooks, exportBooksCsvUrl, importBooksCsv } from '../services/api';
+import { api, browseBooks, getGenres, bulkDeleteBooks, exportBooksCsv, importBooksCsv } from '../services/api';
 import BookForm from '../components/Books/BookForm';
 import { PageHeader, StatusBadge, EmptyState, LoadingSkeleton } from '../components/layout/EnterpriseLibrary';
 import { BookOpen, Star, Heart } from 'lucide-react';
@@ -45,9 +46,12 @@ const Books = () => {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLibrarian, setIsLibrarian] = useState(false);
+  const [isStudent, setIsStudent] = useState(false);
 
   // Advanced Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,13 +79,26 @@ const Books = () => {
     if (stored) {
       try {
         const user = JSON.parse(stored);
-        setIsAdmin(user.role === 'admin');
+            setIsAdmin(user.role === 'admin');
+            setIsLibrarian(user.role === 'librarian');
+            setIsStudent(user.role === 'member');
       } catch (e) {
         console.error(e);
       }
     }
     loadGenresList();
   }, []);
+
+  useEffect(() => {
+    if (showForm) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showForm]);
 
   useEffect(() => {
     loadBooksData();
@@ -145,19 +162,21 @@ const Books = () => {
     }
   };
 
-  const handleCsvExport = () => {
-    const token = localStorage.getItem('access_token');
-    const exportUrl = exportBooksCsvUrl();
-
-    // Perform file download by creating a temporary anchor tag with proper authorization if required.
-    // In our backend implementation, current_admin is a Dependency which checks standard authorization.
-    // If the browser session is authenticated, we can direct location.href or fetch. We'll use a direct link.
-    const a = document.createElement('a');
-    a.href = exportUrl;
-    a.download = 'library_books_export.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const handleCsvExport = async () => {
+    try {
+      const blob = await exportBooksCsv();
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'library_books_export.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export books", err);
+      alert("Failed to export books");
+    }
   };
 
   const handleCsvImport = async (e) => {
@@ -203,6 +222,33 @@ const Books = () => {
     setShowForm(true);
   };
 
+  const handleReserve = async (bookId) => {
+    try {
+      await api.post('/reservations/reserve', { book_id: bookId });
+      setSuccess('Book reserved successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to reserve book');
+      setTimeout(() => setError(''), 4000);
+    }
+  };
+
+  const handleBorrow = async (bookId) => {
+    try {
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      if (!user || !user.username) throw new Error("Could not find user details");
+
+      await api.post('/borrows/issue', { student_id: user.username, book_id: bookId });
+      setSuccess('Book issued successfully!');
+      loadBooksData();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to issue book');
+      setTimeout(() => setError(''), 4000);
+    }
+  };
+
   const handleAdd = () => {
     setEditingBook(null);
     setShowForm(true);
@@ -215,12 +261,10 @@ const Books = () => {
     loadGenresList();
   };
 
-  if (showForm) {
-    return <BookForm book={editingBook} onSave={handleFormClose} onCancel={handleFormClose} />;
-  }
+
 
   return (
-    <div className="books-page">
+    <div className="premium-page-wrapper">
       {/* ── PageHeader Component Migration ── */}
       <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
         <PageHeader
@@ -339,6 +383,11 @@ const Books = () => {
       )}
 
       {error && <div className="error">{error}</div>}
+      {success && (
+        <div style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #dcfce7', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem', fontWeight: '600' }}>
+          {success}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ padding: '2rem 0' }}>
@@ -397,24 +446,39 @@ const Books = () => {
                   <div className="card-divider"></div>
 
                   <div className="card-stats-grid">
-                    <div className="stat-col">
-                      <span className="stat-label">COPIES</span>
-                      <span className="stat-value">{book.available_copies} / {book.total_copies}</span>
+                    <div className="book-stat-col">
+                      <span className="book-stat-label">COPIES</span>
+                      <span className="book-stat-value">{book.available_copies} / {book.total_copies}</span>
                     </div>
-                    <div className="stat-col">
-                      <span className="stat-label">GENRE</span>
-                      <span className="stat-value">{book.genre || '—'}</span>
+                    <div className="book-stat-col">
+                      <span className="book-stat-label">GENRE</span>
+                      <span className="book-stat-value">{book.genre || '—'}</span>
                     </div>
-                    <div className="stat-col">
-                      <span className="stat-label">PRICE</span>
-                      <span className="stat-value">₹{book.price?.toFixed(2) || '0.00'}</span>
+                    <div className="book-stat-col">
+                      <span className="book-stat-label">PRICE</span>
+                      <span className="book-stat-value">₹{book.price?.toFixed(2) || '0.00'}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="card-actions-row">
                   <button className="btn-outline btn-view" onClick={() => navigate(`/books/${book.id}`)}>View</button>
-                  <button className="btn-outline btn-edit" onClick={() => handleEdit(book)}>Edit</button>
+                  
+                  {(isAdmin || isLibrarian) ? (
+                    <>
+                      <button className="btn-outline btn-edit" onClick={() => handleEdit(book)}>Edit</button>
+                      <button className="btn-outline" style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }} onClick={() => navigate(`/issue-return?book_id=${book.id}`)}>Issue</button>
+                    </>
+                  ) : (
+                    <>
+                      {(book.is_available && book.available_copies > 0) ? (
+                        <button className="btn-outline" style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }} onClick={() => handleBorrow(book.id)}>Borrow</button>
+                      ) : (
+                        <button className="btn-outline" style={{ borderColor: '#3b82f6', color: '#3b82f6' }} onClick={() => handleReserve(book.id)}>Reserve</button>
+                      )}
+                    </>
+                  )}
+                  
                   {isAdmin && (
                     <button className="btn-outline btn-delete" onClick={() => handleDelete(book.id, book.title)}>Delete</button>
                   )}
@@ -446,6 +510,14 @@ const Books = () => {
             </div>
           )}
         </>
+      )}
+      {showForm && createPortal(
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <BookForm book={editingBook} onSave={handleFormClose} onCancel={handleFormClose} />
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

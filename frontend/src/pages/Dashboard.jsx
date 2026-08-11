@@ -129,7 +129,7 @@ const Dashboard = () => {
 
   if (!isAdmin && !isLibrarian) {
     return (
-      <div className="dashboard-wrapper" style={{ width: '100%', maxWidth: 'none', margin: '0', padding: '2rem 3rem' }}>
+      <div className="premium-page-wrapper" style={{ width: '100%', maxWidth: 'none', margin: '0', padding: '2rem 3rem' }}>
         {/* ── User PageHeader Component Migration ── */}
         <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
           <PageHeader
@@ -166,7 +166,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="dashboard-wrapper">
+    <div className="premium-page-wrapper">
       {/* ── PageHeader Component Migration ── */}
       <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
         <PageHeader
@@ -418,25 +418,17 @@ const Dashboard = () => {
             title="Recent Transactions"
             headerActions={
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                <input
-                  type="text"
-                  placeholder="Search transactions..."
-                  value={txSearch}
-                  onChange={(e) => {
-                    setTxSearch(e.target.value);
-                    setTxPage(1);
-                  }}
-                  style={{
-                    padding: '0.4rem 0.8rem',
-                    fontSize: '0.82rem',
-                    borderRadius: '8px',
-                    border: '1.5px solid rgba(226,211,179,0.4)',
-                    background: '#fdfcf9',
-                    color: '#1e1b15',
-                    outline: 'none',
-                    width: '180px'
-                  }}
-                />
+                <div className="premium-input-wrapper no-icon" style={{ width: '180px' }}>
+                  <input
+                    type="text"
+                    placeholder="Search transactions..."
+                    value={txSearch}
+                    onChange={(e) => {
+                      setTxSearch(e.target.value);
+                      setTxPage(1);
+                    }}
+                  />
+                </div>
                 <Link to="/transactions" style={{ fontSize: '0.8rem', fontWeight: '700', color: '#D4A017', textDecoration: 'none' }}>View All →</Link>
               </div>
             }
@@ -533,3 +525,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

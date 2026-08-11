@@ -3,9 +3,9 @@ from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
-from app.database import get_db
-from app.core.security import get_current_user
-from app.core.rbac import has_permission
+from ..database import get_db
+from ..core.security import get_current_user
+from ..core.rbac import has_permission
 
 router = APIRouter(prefix="/api/v1/contact", tags=["contact"])
 

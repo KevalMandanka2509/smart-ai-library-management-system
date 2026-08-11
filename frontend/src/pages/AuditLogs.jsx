@@ -21,7 +21,6 @@ const ROLE_CATEGORIES = [
   ['', 'All Roles'],
   ['admin', 'Admin'],
   ['librarian', 'Librarian'],
-  ['staff', 'Staff Assistant'],
   ['member', 'Member / Student']
 ];
 
@@ -93,7 +92,7 @@ const AuditLogs = () => {
   };
 
   return (
-    <div className="dashboard-wrapper" style={{ padding: '2rem 2.5rem' }}>
+    <div className="premium-page-wrapper" style={{ padding: '2rem 2.5rem' }}>
       {/* ── Header ── */}
       <header className="dashboard-header-bar" style={{ marginBottom: '1.5rem' }}>
         <div className="header-meta">
@@ -122,61 +121,66 @@ const AuditLogs = () => {
       <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.75rem', boxShadow: '0 6px 20px rgba(20,18,15,0.03)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', alignItems: 'center' }}>
           {/* Query search */}
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.3rem' }}>SEARCH</label>
-            <input
-              type="text"
-              placeholder="Username, details, resource…"
-              value={query}
-              onChange={e => { setQuery(e.target.value); setPage(1); }}
-              style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1.5px solid rgba(212,160,23,0.3)', borderRadius: '8px', outline: 'none', background: '#fdfcf9' }}
-            />
+          <div className="premium-form-group">
+            <label className="premium-label">SEARCH</label>
+            <div className="premium-input-wrapper no-icon">
+              <input
+                type="text"
+                placeholder="Username, details, resource…"
+                value={query}
+                onChange={e => { setQuery(e.target.value); setPage(1); }}
+              />
+            </div>
           </div>
 
           {/* Action category */}
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.3rem' }}>ACTION CATEGORY</label>
-            <select
-              value={actionFilter}
-              onChange={e => { setActionFilter(e.target.value); setPage(1); }}
-              style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1.5px solid rgba(212,160,23,0.3)', borderRadius: '8px', outline: 'none', background: '#fdfcf9' }}
-            >
-              {ACTION_CATEGORIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
+          <div className="premium-form-group">
+            <label className="premium-label">ACTION CATEGORY</label>
+            <div className="premium-input-wrapper no-icon">
+              <select
+                value={actionFilter}
+                onChange={e => { setActionFilter(e.target.value); setPage(1); }}
+              >
+                {ACTION_CATEGORIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
           </div>
 
           {/* User role */}
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.3rem' }}>USER ROLE</label>
-            <select
-              value={roleFilter}
-              onChange={e => { setRoleFilter(e.target.value); setPage(1); }}
-              style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1.5px solid rgba(212,160,23,0.3)', borderRadius: '8px', outline: 'none', background: '#fdfcf9' }}
-            >
-              {ROLE_CATEGORIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
+          <div className="premium-form-group">
+            <label className="premium-label">USER ROLE</label>
+            <div className="premium-input-wrapper no-icon">
+              <select
+                value={roleFilter}
+                onChange={e => { setRoleFilter(e.target.value); setPage(1); }}
+              >
+                {ROLE_CATEGORIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
           </div>
 
           {/* Date from */}
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.3rem' }}>DATE FROM</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-              style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1.5px solid rgba(212,160,23,0.3)', borderRadius: '8px', outline: 'none', background: '#fdfcf9' }}
-            />
+          <div className="premium-form-group">
+            <label className="premium-label">DATE FROM</label>
+            <div className="premium-input-wrapper no-icon">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+              />
+            </div>
           </div>
 
           {/* Date to */}
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#5c5549', marginBottom: '0.3rem' }}>DATE TO</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={e => { setDateTo(e.target.value); setPage(1); }}
-              style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1.5px solid rgba(212,160,23,0.3)', outline: 'none', background: '#fdfcf9' }}
-            />
+          <div className="premium-form-group">
+            <label className="premium-label">DATE TO</label>
+            <div className="premium-input-wrapper no-icon">
+              <input
+                type="date"
+                value={dateTo}
+                onChange={e => { setDateTo(e.target.value); setPage(1); }}
+              />
+            </div>
           </div>
         </div>
 
@@ -280,3 +284,4 @@ const AuditLogs = () => {
 };
 
 export default AuditLogs;
+
