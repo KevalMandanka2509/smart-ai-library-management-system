@@ -307,8 +307,7 @@ const Profile = () => {
 
   if (loading) {
     return (
-      <div className="dashboard-loading">
-        <div className="spinner" />
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', color: '#8c8273' }}>
         <span>Loading account profile...</span>
       </div>
     );
@@ -317,16 +316,13 @@ const Profile = () => {
   const isAdmin = profile?.role === 'admin';
 
   return (
-    <div className="dashboard-wrapper" style={{ width: '100%', maxWidth: 'none', margin: '0', padding: '2rem 3rem' }}>
+    <div className="premium-page-wrapper">
       {/* ── Header ── */}
-      <header className="dashboard-header-bar" style={{ marginBottom: '1.5rem' }}>
-        <div className="header-meta">
-          <h2>Account Profile & Management</h2>
-          <span className="header-role-badge">
-            {profile.role ? profile.role.toUpperCase() : 'MEMBER'} ACCOUNT
-          </span>
-        </div>
-      </header>
+      <PageHeader 
+        title="Account Profile & Management" 
+        subtitle="Manage your personal settings and activity"
+        badgeText={`${profile.role ? profile.role.toUpperCase() : 'MEMBER'} ACCOUNT`}
+      />
 
       {error && (
         <div style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', padding: '1rem 1.25rem', borderRadius: '12px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
@@ -770,9 +766,9 @@ const Profile = () => {
                     </div>
                   </div>
                 </div>
-                <div className="modal-footer" style={{ marginTop: '2rem' }}>
-                  <button type="button" className="btn-cancel" onClick={() => setShowAddUserModal(false)}>Cancel</button>
-                  <button type="submit" className="btn-submit" disabled={creatingUser}>{creatingUser ? 'Creating...' : 'Create User'}</button>
+                <div className="modal-footer" style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end', paddingTop: '1.5rem', borderTop: '1px solid rgba(226,211,179,0.3)' }}>
+                  <button type="button" className="add-btn" style={{ background: '#f5ecd5', color: 'var(--gold-dark)', border: '1px solid var(--gold)' }} onClick={() => setShowAddUserModal(false)}>Cancel</button>
+                  <button type="submit" className="add-btn" disabled={creatingUser}>{creatingUser ? 'Creating...' : 'Create Employee'}</button>
                 </div>
               </form>
             </div>
@@ -834,10 +830,10 @@ const Profile = () => {
                 </div>
               </div>
 
-              <div className="modal-footer" style={{ marginTop: '2rem' }}>
-                <button type="button" className="btn-cancel" onClick={() => setSelectedUserForPerms(null)}>Cancel</button>
-                <button type="button" className="btn-submit" onClick={handleSaveUserRolePerms}>Save Permissions</button>
-              </div>
+                <div className="modal-footer" style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end', paddingTop: '1.5rem', borderTop: '1px solid rgba(226,211,179,0.3)' }}>
+                  <button type="button" className="add-btn" style={{ background: '#f5ecd5', color: 'var(--gold-dark)', border: '1px solid var(--gold)' }} onClick={() => setSelectedUserForPerms(null)}>Cancel</button>
+                  <button type="button" className="add-btn" onClick={handleSaveUserRolePerms}>Save Permissions</button>
+                </div>
             </div>
           </div>
         </div>,

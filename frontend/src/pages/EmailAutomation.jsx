@@ -12,6 +12,8 @@ import {
 import { formatIST } from '../utils/dateUtils';
 import './EmailAutomation.css';
 
+import { PageHeader } from '../components/layout/EnterpriseLibrary';
+
 const EmailAutomation = () => {
   // Active Tab
   const [activeTab, setActiveTab] = useState('history');
@@ -205,19 +207,16 @@ const EmailAutomation = () => {
   ];
 
   return (
-    <div className="email-automation-page">
+    <div className="premium-page-wrapper">
       {/* Page Header */}
-      <div className="email-page-header">
-        <div className="email-header-text">
-          <h1>📧 Email Automation</h1>
-          <p>Manage email templates, dispatch custom emails, view history, and configure SMTP delivery.</p>
-        </div>
-        <div className="email-header-actions">
-          <button className="btn-email-secondary" onClick={() => { setActiveTab('history'); loadHistory(); }}>
-            🔄 Refresh
-          </button>
-        </div>
-      </div>
+      <PageHeader 
+        title="📧 Email Automation" 
+        subtitle="Manage email templates, dispatch custom emails, view history, and configure SMTP delivery."
+      >
+        <button className="add-btn" onClick={() => { setActiveTab('history'); loadHistory(); }}>
+          🔄 Refresh
+        </button>
+      </PageHeader>
 
       {/* Alerts */}
       {success && <div className="email-alert success">✅ {success}</div>}

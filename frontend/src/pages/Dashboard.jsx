@@ -5,7 +5,7 @@ import { getDashboardAnalytics } from '../services/api';
 import UserDashboard from '../components/UserDashboard';
 import { Trophy, Users } from 'lucide-react';
 import { AnalyticsCard, PageHeader, ChartCard, DataTable } from '../components/layout/EnterpriseLibrary';
-import '../styles/design-tokens.css';
+
 import './Dashboard.css';
 
 import { Sparkline, BorrowTrendChart, BorrowActivityHeatmap, DonutChart, HBar, KpiCard, COLORS } from '../components/DashboardCharts';
@@ -168,12 +168,10 @@ const Dashboard = () => {
   return (
     <div className="premium-page-wrapper">
       {/* ── PageHeader Component Migration ── */}
-      <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
-        <PageHeader
-          title="Analytics Dashboard"
-          subtitle={`${isAdmin ? 'System Administrator' : 'Librarian'} · Live Data`}
-        />
-      </div>
+      <PageHeader
+        title="Analytics Dashboard"
+        subtitle={`${isAdmin ? 'System Administrator' : 'Librarian'} · Live Data`}
+      />
 
       {error && (
         <div style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', padding: '1rem', borderRadius: '12px', fontWeight: 'bold' }}>
@@ -525,4 +523,5 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
 

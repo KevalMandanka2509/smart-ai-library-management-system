@@ -4,6 +4,8 @@ import { getBook, deleteBook, getBarcodeImageUrl, getQrImageUrl } from '../servi
 import './books.css';
 import { formatIST } from '../utils/dateUtils';
 
+import { PageHeader } from '../components/layout/EnterpriseLibrary';
+
 // SVG Icons
 const IconBack = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -100,7 +102,7 @@ const BookDetailPage = () => {
   // Loading state
   if (loading) {
     return (
-      <div className="books-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+      <div className="premium-page-wrapper">
         <div style={{ textAlign: 'center' }}>
           <div className="spinner" style={{
             width: 40, height: 40, border: '3px solid rgba(212,160,23,0.15)',
@@ -116,7 +118,7 @@ const BookDetailPage = () => {
   // Error state
   if (error && !book) {
     return (
-      <div className="books-page">
+      <div className="premium-page-wrapper">
         <button
           onClick={() => navigate('/books')}
           aria-label="Back to Books"
@@ -157,7 +159,7 @@ const BookDetailPage = () => {
     ? Math.round((book.available_copies / book.total_copies) * 100) : 0;
 
   return (
-    <div className="books-page">
+    <div className="premium-page-wrapper">
       {/* Back navigation */}
       <button
         onClick={() => navigate('/books')}

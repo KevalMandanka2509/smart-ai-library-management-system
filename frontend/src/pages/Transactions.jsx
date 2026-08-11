@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getTransactions, bulkReturnBooks } from '../services/api';
 import { formatIST } from '../utils/dateUtils';
 import { PageHeader, DataTable, StatusBadge } from '../components/layout/EnterpriseLibrary';
-import '../styles/design-tokens.css';
+
 import './Dashboard.css'; // Reuse table styling
 
 const IconTrash = () => (
@@ -120,28 +120,25 @@ const Transactions = () => {
   return (
     <div className="premium-page-wrapper" style={{ padding: '2rem' }}>
       {/* ── PageHeader Component Migration ── */}
-      <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
-        <PageHeader
-          title="Circulation Ledgers"
-          subtitle="System Transactions"
-        />
-      </div>
+      <PageHeader
+        title="Circulation Ledgers"
+        subtitle="System Transactions"
+      />
 
       {error && (
-        <div style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fee2e2', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
+        <div className="error-alert" style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fee2e2', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
           {error}
         </div>
       )}
 
       {success && (
-        <div style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #dcfce7', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
+        <div className="success-alert" style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #dcfce7', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
           {success}
         </div>
       )}
 
       {/* Advanced Filters */}
-      <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.5)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: 'var(--shadow-soft)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center' }}>
           <div>
             <div className="premium-input-wrapper no-icon">
               <input
@@ -176,7 +173,6 @@ const Transactions = () => {
             />
             <label htmlFor="overdue-only" style={{ fontWeight: '600', cursor: 'pointer', userSelect: 'none' }}>Overdue Only</label>
           </div>
-        </div>
       </div>
 
       {activeIssuedTxsOnPage.length > 0 && (
@@ -204,7 +200,7 @@ const Transactions = () => {
         </div>
       )}
 
-      <div className="info-card" style={{ background: '#ffffff', borderRadius: '16px', padding: '2rem', border: '1px solid rgba(226,211,179,0.55)' }}>
+      <div className="table-container" style={{ background: '#ffffff', borderRadius: '16px', padding: '2rem', border: '1px solid rgba(226,211,179,0.55)', boxShadow: '0 10px 30px rgba(0,0,0,0.02)' }}>
         {(() => {
           const columns = [
             {
@@ -272,4 +268,5 @@ const Transactions = () => {
 };
 
 export default Transactions;
+
 

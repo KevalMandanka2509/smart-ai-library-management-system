@@ -3,8 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { getActiveReservations, reserveBook, cancelReservation } from '../services/api';
 import { formatIST } from '../utils/dateUtils';
 import { PageHeader, DataTable, StatusBadge } from '../components/layout/EnterpriseLibrary';
-import '../styles/design-tokens.css';
-import './Dashboard.css'; // Reuse table styling
+import { BookOpen, User } from 'lucide-react';
+
+import './Students.css'; // Use unified form styles
 
 const Reservations = () => {
   const [reservations, setReservations] = useState([]);
@@ -91,12 +92,10 @@ const Reservations = () => {
   return (
     <div className="premium-page-wrapper" style={{ padding: '2rem' }}>
       {/* ── PageHeader Component Migration ── */}
-      <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
-        <PageHeader
-          title="Reservations Queue"
-          subtitle="Track and place holds on out-of-stock books"
-        />
-      </div>
+      <PageHeader
+        title="Reservations Queue"
+        subtitle="Track and place holds on out-of-stock books"
+      />
 
       {error && (
         <div style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fee2e2', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
@@ -111,52 +110,55 @@ const Reservations = () => {
       )}
 
       {/* Place Hold / Reservation Form Card */}
-      <div className="info-card" style={{ background: '#ffffff', borderRadius: '16px', padding: '2rem', border: '1px solid rgba(226,211,179,0.55)', marginBottom: '2rem' }}>
-        <h3 style={{ marginBottom: '1rem', color: 'var(--ink)' }}>Place a New Hold / Reservation</h3>
-        <form onSubmit={handleCreateReservation} style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 1fr auto' : '1fr auto', gap: '1rem', alignItems: 'end' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: '600', fontSize: '0.85rem' }}>Book ID / ISBN / Exact Title</label>
-            <input
-              type="text"
-              placeholder="e.g., 978-0132350884 or Clean Code"
-              value={bookIdInput}
-              onChange={(e) => setBookIdInput(e.target.value)}
-              style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', background: '#fffdf9', outline: 'none' }}
-            />
-          </div>
-          {isAdmin && (
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: '600', fontSize: '0.85rem' }}>Student ID</label>
-              <input
-                type="text"
-                placeholder="e.g., STU001"
-                value={studentIdInput}
-                onChange={(e) => setStudentIdInput(e.target.value)}
-                style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', background: '#fffdf9', outline: 'none' }}
-              />
+      <div className="add-student-card" style={{ background: '#ffffff', borderRadius: '16px', padding: '2rem', border: '1px solid rgba(226,211,179,0.55)', marginBottom: '2rem' }}>
+        <h3 style={{ marginBottom: '1.5rem', color: '#1e1b15', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.25rem' }}>
+          <BookOpen size={20} color="var(--eu-color-primary)" /> Place a New Hold / Reservation
+        </h3>
+        <form onSubmit={handleCreateReservation} className="student-form">
+          <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: isAdmin ? 'repeat(auto-fit, minmax(300px, 1fr))' : '1fr', gap: '1.5rem', alignItems: 'end' }}>
+            <div className="premium-form-group" style={{ marginBottom: 0 }}>
+              <label>Book ID / ISBN / Exact Title *</label>
+              <div className="premium-input-wrapper">
+                <BookOpen className="premium-input-icon" size={16} />
+                <input
+                  type="text"
+                  placeholder="e.g., 978-0132350884 or Clean Code"
+                  value={bookIdInput}
+                  onChange={(e) => setBookIdInput(e.target.value)}
+                  required
+                />
+              </div>
             </div>
-          )}
-          <button
-            type="submit"
-            disabled={submitting}
-            style={{
-              background: 'linear-gradient(135deg, #e4a81e, #b88610)',
-              color: '#ffffff',
-              border: 'none',
-              padding: '0.8rem 1.8rem',
-              borderRadius: '12px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              height: '46px',
-              transition: 'all 0.25s ease'
-            }}
-          >
-            {submitting ? 'Placing hold...' : 'Reserve Book'}
-          </button>
+            {isAdmin && (
+              <div className="premium-form-group" style={{ marginBottom: 0 }}>
+                <label>Student ID *</label>
+                <div className="premium-input-wrapper">
+                  <User className="premium-input-icon" size={16} />
+                  <input
+                    type="text"
+                    placeholder="e.g., STU001"
+                    value={studentIdInput}
+                    onChange={(e) => setStudentIdInput(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+              <button
+                type="submit"
+                className="add-btn"
+                disabled={submitting}
+                style={{ height: '46px', width: 'auto', minWidth: '180px', padding: '0 2rem' }}
+              >
+                {submitting ? 'Placing hold...' : 'Reserve Book'}
+              </button>
+            </div>
+          </div>
         </form>
       </div>
 
-      <div className="info-card" style={{ background: '#ffffff', borderRadius: '16px', padding: '2rem', border: '1px solid rgba(226,211,179,0.55)' }}>
+      <div className="table-container" style={{ background: '#ffffff', borderRadius: '16px', padding: '2rem', border: '1px solid rgba(226,211,179,0.55)', boxShadow: '0 10px 30px rgba(0,0,0,0.02)' }}>
         {(() => {
           const columns = [];
           if (isAdmin) {
@@ -188,14 +190,18 @@ const Reservations = () => {
                 <button
                   onClick={() => handleCancel(row.id)}
                   style={{
-                    background: '#fee2e2',
-                    color: '#b91c1c',
-                    border: '1px solid #fecaca',
-                    padding: '0.4rem 0.8rem',
+                    background: '#fffdf9',
+                    color: '#dc2626',
+                    border: '1px solid rgba(220, 38, 38, 0.3)',
+                    padding: '0.5rem 1rem',
                     borderRadius: '8px',
                     fontWeight: '600',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    fontSize: '0.85rem'
                   }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.borderColor = '#dc2626'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = '#fffdf9'; e.currentTarget.style.borderColor = 'rgba(220, 38, 38, 0.3)'; }}
                 >
                   Cancel Hold
                 </button>
@@ -218,4 +224,5 @@ const Reservations = () => {
 };
 
 export default Reservations;
+
 

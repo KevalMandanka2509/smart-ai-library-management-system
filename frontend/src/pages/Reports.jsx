@@ -12,6 +12,8 @@ import ExecutiveReport from '../components/reports/ExecutiveReport';
 import FinancialAnalytics from '../components/reports/FinancialAnalytics';
 import { BorrowActivityHeatmap } from '../components/DashboardCharts';
 
+import { PageHeader } from '../components/layout/EnterpriseLibrary';
+
 // ─────────────────────────────────────────────────────────────
 // SVG Line Chart for trend data
 // ─────────────────────────────────────────────────────────────
@@ -155,16 +157,11 @@ function exportHTML(title, headers, rows, filename) {
 // Tab button
 // ─────────────────────────────────────────────────────────────
 const TabBtn = ({ label, active, onClick, count }) => (
-  <button onClick={onClick} style={{
-    padding: '0.55rem 1.2rem',
-    borderRadius: '8px',
-    border: active ? '1.5px solid #D4A017' : '1.5px solid transparent',
-    background: active ? 'rgba(212,160,23,0.08)' : 'transparent',
-    color: active ? '#b3861b' : '#5c5549',
-    fontWeight: '700', fontSize: '0.875rem', cursor: 'pointer',
-    display: 'flex', alignItems: 'center', gap: '0.4rem',
-    transition: 'all 0.18s ease'
-  }}>
+  <button 
+    className={`premium-tab ${active ? 'active' : ''}`}
+    onClick={onClick} 
+    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+  >
     {label}
     {count !== undefined && (
       <span style={{
@@ -309,52 +306,43 @@ const Reports = () => {
   const { summary, trend } = reportData || { summary: {}, trend: [] };
 
   return (
-    <div className="dashboard-wrapper" style={{ padding: '2rem 2.5rem' }}>
+    <div className="premium-page-wrapper">
       {/* ── Header ── */}
-      <header className="dashboard-header-bar" style={{ marginBottom: '0', display: 'flex', flexDirection: 'column', gap: '1.25rem', alignItems: 'stretch' }}>
-        <div className="header-meta">
-          <h2>Analytical Reports</h2>
-          <span className="header-role-badge">
-            {granularity.charAt(0).toUpperCase() + granularity.slice(1)} · Last {period} periods
-          </span>
-        </div>
-        {/* Granularity & Period Controls */}
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
-          <div style={{ display: 'flex', gap: '0.4rem', background: '#f5f5f5', padding: '0.3rem', borderRadius: '10px', flexWrap: 'wrap' }}>
+      <PageHeader 
+        title="Analytical Reports" 
+        subtitle={`${granularity.charAt(0).toUpperCase() + granularity.slice(1)} · Last ${period} periods`}
+      >
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="premium-tab-container" style={{ padding: '0.2rem' }}>
             {GRANULARITIES.map(g => (
-              <button key={g.value} onClick={() => handleGranChange(g.value)} style={{
-                padding: '0.4rem 0.9rem', borderRadius: '7px', border: 'none',
-                background: granularity === g.value ? '#D4A017' : 'transparent',
-                color: granularity === g.value ? '#fff' : '#5c5549',
-                fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer',
-                transition: 'all 0.18s ease'
-              }}>{g.label}</button>
+              <button 
+                key={g.value} 
+                onClick={() => handleGranChange(g.value)} 
+                className={`premium-tab ${granularity === g.value ? 'active' : ''}`}
+                style={{ padding: '0.35rem 0.8rem', minWidth: 'auto' }}
+              >
+                {g.label}
+              </button>
             ))}
           </div>
-          <select
-            value={period}
-            onChange={e => setPeriod(Number(e.target.value))}
-            style={{
-              padding: '0.45rem 0.85rem', border: '1.5px solid rgba(226,211,179,0.7)',
-              borderRadius: '8px', background: '#fff', fontWeight: '700',
-              color: '#1e1b15', fontSize: '0.85rem', cursor: 'pointer', outline: 'none',
-              flex: '1', minWidth: '120px'
-            }}
-          >
-            {granularity === 'daily'
-              ? [7, 14, 30, 60, 90].map(v => <option key={v} value={v}>Last {v} days</option>)
-              : granularity === 'weekly'
-                ? [4, 8, 12, 24, 52].map(v => <option key={v} value={v}>Last {v} weeks</option>)
-                : [3, 6, 12, 24].map(v => <option key={v} value={v}>Last {v} months</option>)
-            }
-          </select>
-          <button onClick={load} style={{
-            padding: '0.45rem 1rem', background: '#D4A017', color: '#fff',
-            border: 'none', borderRadius: '8px', fontWeight: '700',
-            fontSize: '0.85rem', cursor: 'pointer', flex: '1', minWidth: '100px'
-          }}>↻ Refresh</button>
+          <div className="premium-input-wrapper no-icon" style={{ margin: 0, minWidth: '150px' }}>
+            <select
+              value={period}
+              onChange={e => setPeriod(Number(e.target.value))}
+            >
+              {granularity === 'daily'
+                ? [7, 14, 30, 60, 90].map(v => <option key={v} value={v}>Last {v} days</option>)
+                : granularity === 'weekly'
+                  ? [4, 8, 12, 24, 52].map(v => <option key={v} value={v}>Last {v} weeks</option>)
+                  : [3, 6, 12, 24].map(v => <option key={v} value={v}>Last {v} months</option>)
+              }
+            </select>
+          </div>
+          <button className="add-btn" onClick={load} style={{ gap: '0.5rem', display: 'flex', alignItems: 'center' }}>
+            ↻ Refresh
+          </button>
         </div>
-      </header>
+      </PageHeader>
 
       {error && (
         <div style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', padding: '1rem', borderRadius: '12px', fontWeight: 'bold', marginTop: '1rem' }}>
@@ -381,12 +369,10 @@ const Reports = () => {
       </div>
 
       {/* ── Tabs ── */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '2rem', flexWrap: 'wrap' }}>
+      <div className="premium-tab-container" style={{ marginTop: '2rem' }}>
         <TabBtn label="Overview" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
-        <TabBtn label="Issue / Return" active={activeTab === 'issue_return'} onClick={() => setActiveTab('issue_return')}
-          count={filteredTx.length} />
-        <TabBtn label="Fine Reports" active={activeTab === 'fines'} onClick={() => setActiveTab('fines')}
-          count={filteredFines.length} />
+        <TabBtn label="Issue / Return" active={activeTab === 'issue_return'} onClick={() => setActiveTab('issue_return')} count={filteredTx.length} />
+        <TabBtn label="Fine Reports" active={activeTab === 'fines'} onClick={() => setActiveTab('fines')} count={filteredFines.length} />
         <TabBtn label="Enterprise AI & Automation" active={activeTab === 'ai_automation'} onClick={() => setActiveTab('ai_automation')} />
       </div>
 
@@ -496,16 +482,13 @@ const Reports = () => {
           <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.75rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
             {/* Controls */}
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search student, book…"
-                style={{
-                  flex: 1, minWidth: '200px', padding: '0.5rem 0.9rem',
-                  border: '1.5px solid rgba(226,211,179,0.7)', borderRadius: '8px',
-                  fontSize: '0.875rem', outline: 'none', background: '#fdfcf9'
-                }}
-              />
+              <div className="premium-input-wrapper no-icon" style={{ flex: 1, minWidth: '200px', margin: 0 }}>
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search student, book…"
+                />
+              </div>
               <div style={{ display: 'flex', gap: '0.4rem', background: '#f5f5f5', padding: '0.3rem', borderRadius: '10px' }}>
                 {[['All', 'all'], ['Issued', 'issued'], ['Returned', 'returned']].map(([l, v]) => (
                   <button key={v} onClick={() => setTxFilter(v)} style={{
@@ -602,16 +585,13 @@ const Reports = () => {
 
             {/* Controls */}
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search student, book…"
-                style={{
-                  flex: 1, minWidth: '200px', padding: '0.5rem 0.9rem',
-                  border: '1.5px solid rgba(226,211,179,0.7)', borderRadius: '8px',
-                  fontSize: '0.875rem', outline: 'none', background: '#fdfcf9'
-                }}
-              />
+              <div className="premium-input-wrapper no-icon" style={{ flex: 1, minWidth: '200px', margin: 0 }}>
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search student, book…"
+                />
+              </div>
               <div style={{ display: 'flex', gap: '0.4rem', background: '#f5f5f5', padding: '0.3rem', borderRadius: '10px' }}>
                 {[['All', 'all'], ['Unpaid', 'unpaid'], ['Paid', 'paid']].map(([l, v]) => (
                   <button key={v} onClick={() => setFineFilter(v)} style={{

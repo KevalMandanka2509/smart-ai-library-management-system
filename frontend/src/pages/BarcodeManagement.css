@@ -77,11 +77,11 @@
 /* Quick Scanner section */
 .quick-scanner-card {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(226, 211, 179, 0.55);
   border-radius: 12px;
   padding: 1.25rem;
   margin-bottom: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px rgba(212, 160, 23, 0.05);
 }
 
 .scanner-header {
@@ -128,19 +128,19 @@
 
 .code-card {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(226, 211, 179, 0.55);
   border-radius: 12px;
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  box-shadow: 0 4px 12px rgba(212, 160, 23, 0.05);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .code-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+  box-shadow: 0 8px 24px rgba(212, 160, 23, 0.12);
 }
 
 .code-card-header {
@@ -168,11 +168,11 @@
   gap: 1rem;
   align-items: center;
   justify-content: space-around;
-  background: #f8fafc;
+  background: #fdfcf9;
   border-radius: 8px;
   padding: 0.85rem;
   margin: 0.75rem 0;
-  border: 1px dashed #cbd5e1;
+  border: 1.5px dashed rgba(212, 160, 23, 0.3);
 }
 
 .preview-box {
@@ -224,26 +224,27 @@
   font-size: 0.8rem;
   font-weight: 600;
   border-radius: 6px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid rgba(226, 211, 179, 0.5);
   background: #ffffff;
-  color: #334155;
+  color: var(--eu-color-secondary, #5c5549);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn-card-action:hover {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: #fdfcf9;
+  color: var(--eu-color-primary, #D4A017);
+  border-color: rgba(212, 160, 23, 0.4);
 }
 
 .btn-card-primary {
-  background: #fef3c7;
-  border-color: #fde68a;
-  color: #92400e;
+  background: rgba(212, 160, 23, 0.08);
+  border-color: rgba(212, 160, 23, 0.3);
+  color: var(--eu-color-primary-hover, #b3861b);
 }
 
 .btn-card-primary:hover {
-  background: #fde68a;
+  background: rgba(212, 160, 23, 0.15);
 }
 
 /* Batch Printable Label Sheet */

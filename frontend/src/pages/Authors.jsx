@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { PageHeader } from '../components/layout/EnterpriseLibrary';
 import { getAuthors, createAuthor, updateAuthor, deleteAuthor } from '../services/api';
 import { User, MapPin, Calendar, FileText, Settings, X, AlertTriangle } from 'lucide-react';
 import './Authors.css';
@@ -138,10 +139,10 @@ const Authors = () => {
 
   return (
     <div className="premium-page-wrapper">
-      <div className="page-header" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>Author Management</h1>
-        <button className="add-btn" onClick={handleAdd}>Add New Author</button>
-      </div>
+      <PageHeader 
+        title="Author Management" 
+        actions={<button className="add-btn" onClick={handleAdd}>Add New Author</button>} 
+      />
 
       {/* Advanced Filters Panel */}
       <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.5)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: 'var(--shadow-soft)' }}>
@@ -388,4 +389,5 @@ const Authors = () => {
 };
 
 export default Authors;
+
 

@@ -5,12 +5,12 @@ import { api, browseBooks, getGenres, bulkDeleteBooks, exportBooksCsv, importBoo
 import BookForm from '../components/Books/BookForm';
 import { PageHeader, StatusBadge, EmptyState, LoadingSkeleton } from '../components/layout/EnterpriseLibrary';
 import { BookOpen, Star, Heart } from 'lucide-react';
-import '../styles/design-tokens.css';
+
 import './books.css';
 
 // Memoized SVG Icons for render optimization
-const IconSearch = memo(() => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const IconSearch = memo((props) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <circle cx="11" cy="11" r="8"></circle>
     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
   </svg>
@@ -266,8 +266,7 @@ const Books = () => {
   return (
     <div className="premium-page-wrapper">
       {/* ── PageHeader Component Migration ── */}
-      <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
-        <PageHeader
+      <PageHeader
           title="Book Catalogue"
           actions={
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -284,7 +283,6 @@ const Books = () => {
             </div>
           }
         />
-      </div>
 
       {importStatus && (
         <div style={{ padding: '1rem', background: '#fbf7ed', border: '1.5px solid var(--gold)', borderRadius: '12px', marginBottom: '1.5rem' }}>
@@ -300,33 +298,30 @@ const Books = () => {
       {/* Advanced Search & Filtering Controls */}
       <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.5)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: 'var(--shadow-soft)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center' }}>
-          <div className="search-bar" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fffdf9', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)' }}>
-            <IconSearch />
+          <div className="premium-input-wrapper" style={{ margin: 0 }}>
+            <IconSearch className="premium-input-icon" size={20} />
             <input
               type="text"
               placeholder="Search title, author, isbn..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.95rem' }}
             />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="premium-input-wrapper no-icon" style={{ margin: 0 }}>
             <select
               value={selectedGenre}
               onChange={(e) => { setSelectedGenre(e.target.value); setCurrentPage(1); }}
-              style={{ padding: '0.75rem', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', background: '#fffdf9', color: 'var(--ink)', fontSize: '0.9rem', outline: 'none' }}
             >
               <option value="">All Categories / Genres</option>
               {genres.map(g => <option key={g} value={g}>{g}</option>)}
             </select>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="premium-input-wrapper no-icon" style={{ margin: 0 }}>
             <select
               value={availabilityFilter}
               onChange={(e) => { setAvailabilityFilter(e.target.value); setCurrentPage(1); }}
-              style={{ padding: '0.75rem', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', background: '#fffdf9', color: 'var(--ink)', fontSize: '0.9rem', outline: 'none' }}
             >
               <option value="">All Availability Statuses</option>
               <option value="available">Available Only</option>
@@ -335,25 +330,27 @@ const Books = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              style={{ flex: 1, padding: '0.75rem', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', background: '#fffdf9', color: 'var(--ink)', fontSize: '0.9rem', outline: 'none' }}
-            >
-              <option value="created_at">Date Added</option>
-              <option value="title">Book Title</option>
-              <option value="author">Author Name</option>
-              <option value="publication_year">Publish Year</option>
-              <option value="price">Price</option>
-            </select>
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
-              style={{ padding: '0.75rem', borderRadius: '12px', border: '1.5px solid rgba(212,160,23,0.25)', background: '#fffdf9', color: 'var(--ink)', fontSize: '0.9rem', outline: 'none' }}
-            >
-              <option value="desc">Desc</option>
-              <option value="asc">Asc</option>
-            </select>
+            <div className="premium-input-wrapper no-icon" style={{ margin: 0, flex: 1 }}>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="created_at">Date Added</option>
+                <option value="title">Book Title</option>
+                <option value="author">Author Name</option>
+                <option value="publication_year">Publish Year</option>
+                <option value="price">Price</option>
+              </select>
+            </div>
+            <div className="premium-input-wrapper no-icon" style={{ margin: 0, minWidth: '80px' }}>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+              >
+                <option value="desc">Desc</option>
+                <option value="asc">Asc</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -524,3 +521,4 @@ const Books = () => {
 };
 
 export default Books;
+

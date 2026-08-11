@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getStudentBorrows } from '../services/api';
 import { formatIST } from '../utils/dateUtils';
 import { PageHeader, DataTable, StatusBadge } from '../components/layout/EnterpriseLibrary';
-import '../styles/design-tokens.css';
+
 import './Dashboard.css';
 
 const MyBooks = () => {
@@ -37,14 +37,12 @@ const MyBooks = () => {
   };
 
   return (
-    <div className="dashboard-wrapper" style={{ padding: '2rem' }}>
+    <div className="premium-page-wrapper">
       {/* ── PageHeader Component Migration ── */}
-      <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
-        <PageHeader
-          title="My Borrowing History"
-          subtitle="Transaction Records"
-        />
-      </div>
+      <PageHeader
+        title="My Borrowing History"
+        subtitle="Transaction Records"
+      />
 
       {error && (
         <div style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fee2e2', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
@@ -85,3 +83,4 @@ const MyBooks = () => {
 };
 
 export default MyBooks;
+

@@ -197,7 +197,6 @@ const Students = () => {
   return (
     <div className="premium-page-wrapper">
       {/* ── PageHeader Component Migration ── */}
-      <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
         <PageHeader
           title="Student Management"
           actions={
@@ -211,7 +210,6 @@ const Students = () => {
             </div>
           }
         />
-      </div>
 
       {importStatus && (
         <div style={{ padding: '1rem', background: '#fbf7ed', border: '1.5px solid var(--gold)', borderRadius: '12px', marginBottom: '1.5rem' }}>

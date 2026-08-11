@@ -14,6 +14,8 @@ import {
 } from '../services/api';
 import './SmsAutomation.css';
 
+import { PageHeader } from '../components/layout/EnterpriseLibrary';
+
 const SmsAutomation = () => {
   // Tabs: history, compose, templates, provider, reminders, otp
   const [activeTab, setActiveTab] = useState('history');
@@ -225,19 +227,16 @@ const SmsAutomation = () => {
   ];
 
   return (
-    <div className="sms-automation-page">
+    <div className="premium-page-wrapper">
       {/* Page Header */}
-      <div className="sms-page-header">
-        <div className="sms-header-text">
-          <h1>📱 SMS Automation</h1>
-          <p>Configure text message gateways, templates, OTP systems, history logging, and bulk due alerts.</p>
-        </div>
-        <div className="sms-header-actions">
-          <button className="btn-sms-secondary" onClick={() => { setActiveTab('history'); loadHistory(); }}>
-            🔄 Refresh
-          </button>
-        </div>
-      </div>
+      <PageHeader 
+        title="📱 SMS Automation" 
+        subtitle="Configure text message gateways, templates, OTP systems, history logging, and bulk due alerts."
+      >
+        <button className="add-btn" onClick={() => { setActiveTab('history'); loadHistory(); }}>
+          🔄 Refresh
+        </button>
+      </PageHeader>
 
       {/* Alerts */}
       {success && <div className="sms-alert success">✅ {success}</div>}

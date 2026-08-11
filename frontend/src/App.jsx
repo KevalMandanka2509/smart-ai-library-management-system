@@ -5,6 +5,7 @@ import TopNavbar from './components/layout/TopNavbar';
 import Footer from './components/layout/Footer';
 import { getMyProfile } from './services/api';
 import './App.css';
+import './styles/design-tokens.css';
 
 // Global Error Boundary Component
 class ErrorBoundary extends Component {
@@ -286,3 +287,4 @@ const App = () => {
 };
 
 export default App;
+

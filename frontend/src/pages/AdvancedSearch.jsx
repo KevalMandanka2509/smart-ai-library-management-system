@@ -5,7 +5,7 @@ import './books.css';
 import './Dashboard.css';
 import { Search, SlidersHorizontal, X, Book, GraduationCap } from 'lucide-react';
 import { PageHeader } from '../components/layout/EnterpriseLibrary';
-import '../styles/design-tokens.css';
+
 
 // ─────────────────────────────────────────────────────────────
 // Highlight helper: wraps matched substring in <mark>
@@ -322,15 +322,13 @@ const AdvancedSearch = () => {
   
 
   return (
-    <div className="books-page">
-      {/* ── Header ── */}
-      <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
-        <PageHeader 
-          title="Advanced Search" 
-          subtitle={isAdmin ? 'Search across books, authors, ISBN, categories, publishers, and students' : 'Search across books, authors, ISBN, categories, publishers'}
-          actions={<div />} 
-        />
-      </div>
+    <div className="premium-page-wrapper">
+      {/* ── PageHeader Component Migration ── */}
+      <PageHeader
+        title="Advanced Search"
+        subtitle={isAdmin ? 'Search across books, authors, ISBN, categories, publishers, and students' : 'Search across books, authors, ISBN, categories, publishers'}
+        actions={<div />} 
+      />
 
       {/* ── Main search bar ── */}
       <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.5)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: 'var(--shadow-soft)' }}>
@@ -648,5 +646,6 @@ const AdvancedSearch = () => {
 };
 
 export default AdvancedSearch;
+
 
 

@@ -3,6 +3,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { getAuditLogsAdvanced, exportAuditLogsCsvUrl } from '../services/api';
 import './Dashboard.css';
 import './books.css';
+import { Download } from 'lucide-react';
+
+import { PageHeader } from '../components/layout/EnterpriseLibrary';
 
 const ACTION_CATEGORIES = [
   ['', 'All Action Categories'],
@@ -92,34 +95,31 @@ const AuditLogs = () => {
   };
 
   return (
-    <div className="premium-page-wrapper" style={{ padding: '2rem 2.5rem' }}>
-      {/* ── Header ── */}
-      <header className="dashboard-header-bar" style={{ marginBottom: '1.5rem' }}>
-        <div className="header-meta">
-          <h2>System Audit & Activity Logs</h2>
-          <span className="header-role-badge">Security & Compliance Ledger</span>
-        </div>
-        <button
-          onClick={handleExportCSV}
-          style={{
-            padding: '0.6rem 1.25rem', background: '#D4A017', color: '#fff',
-            border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.875rem',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem'
-          }}
-        >
-          ⬇ Export CSV
-        </button>
-      </header>
+    <div className="premium-page-wrapper">
+      {/* ── PageHeader Component Migration ── */}
+      <PageHeader
+        title="System Audit & Activity Logs"
+        subtitle="Security & Compliance Ledger"
+        actions={
+          <button
+            onClick={handleExportCSV}
+            className="add-btn"
+            style={{ height: '42px', padding: '0 1.5rem', width: 'auto' }}
+          >
+            <Download size={18} /> Export CSV
+          </button>
+        }
+      />
 
       {error && (
-        <div style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
+        <div className="error-alert" style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fee2e2', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
           {error}
         </div>
       )}
 
       {/* ── Filter Controls Panel ── */}
-      <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.75rem', boxShadow: '0 6px 20px rgba(20,18,15,0.03)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', alignItems: 'center' }}>
+      <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.5)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.75rem', boxShadow: 'var(--shadow-soft)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', alignItems: 'end' }}>
           {/* Query search */}
           <div className="premium-form-group">
             <label className="premium-label">SEARCH</label>
@@ -194,7 +194,7 @@ const AuditLogs = () => {
       </div>
 
       {/* ── Table & Pagination ── */}
-      <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.75rem', boxShadow: '0 6px 20px rgba(20,18,15,0.03)' }}>
+      <div className="table-container" style={{ background: '#ffffff', borderRadius: '16px', padding: '1.75rem', border: '1px solid rgba(226,211,179,0.55)', boxShadow: '0 10px 30px rgba(0,0,0,0.02)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <h4 style={{ margin: 0, fontWeight: '800', color: '#1e1b15' }}>Activity Ledger</h4>
           <span style={{ fontSize: '0.85rem', color: '#5c5549', fontWeight: '600' }}>

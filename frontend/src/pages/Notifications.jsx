@@ -194,7 +194,7 @@ const Notifications = () => {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <div className="notifications-page">
+    <div className="premium-page-wrapper">
       {/* Page Header */}
       <PageHeader 
         title="🔔 Notifications Center" 
@@ -202,8 +202,8 @@ const Notifications = () => {
       />
 
       {/* Alert Feedbacks */}
-      {success && <div className="sms-alert success" style={{ marginBottom: '1.25rem' }}>✅ {success}</div>}
-      {error && <div className="sms-alert error" style={{ marginBottom: '1.25rem' }}>❌ {error}</div>}
+      {success && <div className="success-alert" style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #dcfce7', padding: '1rem', borderRadius: '8px', marginBottom: '1.25rem', fontWeight: 'bold' }}>✅ {success}</div>}
+      {error && <div className="error-alert" style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fee2e2', padding: '1rem', borderRadius: '8px', marginBottom: '1.25rem', fontWeight: 'bold' }}>❌ {error}</div>}
 
       {/* Tabs Layout */}
       <div className="notif-tab-nav" style={{ marginBottom: '1.5rem' }}>

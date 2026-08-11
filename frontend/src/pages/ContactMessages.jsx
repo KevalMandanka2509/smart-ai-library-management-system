@@ -58,10 +58,10 @@ const ContactMessages = () => {
         { key: 'created_at', label: 'Date', render: (val) => formatIST(val) },
         { key: 'actions', label: 'Actions', render: (val, row) => (
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="eu-btn eu-btn-secondary" style={{padding: '0.4rem', minWidth: 'auto'}} onClick={(e) => { e.stopPropagation(); setSelectedMessage(row); }}>
+                <button className="add-btn" style={{ background: '#f5ecd5', color: 'var(--gold-dark)', border: '1px solid var(--gold)', padding: '0.4rem', minWidth: 'auto', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={(e) => { e.stopPropagation(); setSelectedMessage(row); }}>
                     <MailOpen size={16} />
                 </button>
-                <button className="eu-btn eu-btn-danger" style={{padding: '0.4rem', minWidth: 'auto'}} onClick={(e) => { e.stopPropagation(); handleDelete(row.id); }}>
+                <button className="add-btn" style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '0.4rem', minWidth: 'auto', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={(e) => { e.stopPropagation(); handleDelete(row.id); }}>
                     <Trash2 size={16} />
                 </button>
             </div>
@@ -70,32 +70,32 @@ const ContactMessages = () => {
 
     if (selectedMessage) {
         return (
-            <div className="contact-messages-wrapper" style={{ padding: '2rem 3rem', width: '100%', maxWidth: '1400px', margin: '0 auto' }}>
-                <PageHeader title="Message Details" subtitle="View and manage sender inquiries" actions={<button className="eu-btn eu-btn-secondary" onClick={() => setSelectedMessage(null)}>Back to Messages</button>} />
-                <div className="eu-card" style={{ padding: '2rem', marginTop: '2rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1.5rem' }}>
+            <div className="premium-page-wrapper">
+                <PageHeader title="Message Details" subtitle="View and manage sender inquiries" actions={<button className="add-btn" style={{ background: '#f5ecd5', color: 'var(--gold-dark)', border: '1px solid var(--gold)', height: '42px', padding: '0 1.5rem', width: 'auto' }} onClick={() => setSelectedMessage(null)}>Back to Messages</button>} />
+                <div className="table-container" style={{ background: '#ffffff', borderRadius: '16px', padding: '2.5rem', marginTop: '2rem', border: '1px solid rgba(226,211,179,0.55)', boxShadow: '0 10px 30px rgba(0,0,0,0.02)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', borderBottom: '1px solid rgba(226,211,179,0.3)', paddingBottom: '1.5rem' }}>
                         <div>
-                            <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--ink)', marginBottom: '0.5rem' }}>{selectedMessage.subject}</h2>
-                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', color: '#64748b', fontSize: '0.9rem' }}>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1e1b15', marginBottom: '0.5rem' }}>{selectedMessage.subject}</h2>
+                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', color: '#8c8273', fontSize: '0.9rem' }}>
                                 <span><strong>From:</strong> {selectedMessage.name} &lt;{selectedMessage.email}&gt;</span>
                                 <span>&bull;</span>
                                 <span>{formatIST(selectedMessage.created_at)}</span>
                                 <span>&bull;</span>
-                                {selectedMessage.is_read ? <StatusBadge type="success" text="Read" /> : <StatusBadge type="warning" text="New" />}
+                                {selectedMessage.is_read ? <StatusBadge label="Read" variant="success" /> : <StatusBadge label="New" variant="warning" />}
                             </div>
                         </div>
                         <div style={{ display: 'flex', gap: '1rem' }}>
                             {!selectedMessage.is_read && (
-                                <button className="eu-btn eu-btn-primary" onClick={() => handleMarkAsRead(selectedMessage.id)}>
+                                <button className="add-btn" style={{ background: 'var(--eu-color-primary)', color: 'white' }} onClick={() => handleMarkAsRead(selectedMessage.id)}>
                                     <CheckCircle size={18} style={{marginRight: '0.5rem'}} /> Mark as Read
                                 </button>
                             )}
-                            <button className="eu-btn eu-btn-danger" onClick={() => handleDelete(selectedMessage.id)}>
+                            <button className="add-btn" style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }} onClick={() => handleDelete(selectedMessage.id)}>
                                 <Trash2 size={18} style={{marginRight: '0.5rem'}} /> Delete
                             </button>
                         </div>
                     </div>
-                    <div style={{ fontSize: '1.05rem', lineHeight: '1.7', color: '#334155', whiteSpace: 'pre-wrap' }}>
+                    <div style={{ fontSize: '1.05rem', lineHeight: '1.7', color: '#5c5549', whiteSpace: 'pre-wrap' }}>
                         {selectedMessage.message}
                     </div>
                 </div>
@@ -104,20 +104,20 @@ const ContactMessages = () => {
     }
 
     return (
-        <div className="contact-messages-wrapper" style={{ padding: '2rem 3rem', width: '100%', maxWidth: '1400px', margin: '0 auto' }}>
+        <div className="premium-page-wrapper">
             <PageHeader 
                 title="Contact Messages" 
                 subtitle="Manage inquiries from the landing page" 
-                actions={<button className="eu-btn eu-btn-secondary" onClick={loadMessages}>Refresh Data</button>} 
+                actions={<button className="add-btn" style={{ height: '42px', padding: '0 1.5rem', width: 'auto' }} onClick={loadMessages}>Refresh Data</button>} 
             />
-            {error && <div className="eu-error-alert" style={{marginBottom: '2rem'}}>{error}</div>}
+            {error && <div className="error-alert" style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fee2e2', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontWeight: 'bold' }}>{error}</div>}
             
-            <div className="eu-card" style={{ marginTop: '2rem' }}>
+            <div className="table-container" style={{ background: '#ffffff', borderRadius: '16px', padding: '2rem', border: '1px solid rgba(226,211,179,0.55)', boxShadow: '0 10px 30px rgba(0,0,0,0.02)' }}>
                 <DataTable 
                     columns={columns} 
                     data={messages} 
-                    isLoading={loading} 
-                    emptyState={<EmptyState icon={Mail} title="No Messages" message="You have no contact messages at this time." />} 
+                    loading={loading}
+                    emptyMessage="You have no contact messages at this time."
                     onRowClick={(row) => setSelectedMessage(row)}
                 />
             </div>

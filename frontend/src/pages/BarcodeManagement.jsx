@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getBooks, getBarcodeImageUrl, getQrImageUrl, bulkGenerateBarcodes, searchBookByCode } from '../services/api';
+import { PageHeader } from '../components/layout/EnterpriseLibrary';
 import './BarcodeManagement.css';
 
 const BarcodeManagement = () => {
@@ -124,29 +125,27 @@ const BarcodeManagement = () => {
   });
 
   return (
-    <div className="barcode-management-page">
-      <div className="page-header-actions">
-        <div className="header-title-section">
-          <h1>Barcode & QR Management</h1>
-          <p>Generate, download, search, and print physical barcode & QR label stickers for books</p>
-        </div>
-        <div className="header-buttons">
-          <button
-            className="btn-secondary-action"
-            onClick={() => handleBulkGenerate(false)}
-            disabled={isGenerating}
-          >
-            ⚡ Bulk Missing Codes
-          </button>
-          <button
-            className="btn-primary-action"
-            onClick={() => handleBulkGenerate(true)}
-            disabled={isGenerating}
-          >
-            🔄 Bulk Regenerate All
-          </button>
-        </div>
-      </div>
+    <div className="premium-page-wrapper">
+      <PageHeader 
+        title="Barcode & QR Management" 
+        subtitle="Generate, download, search, and print physical barcode & QR label stickers for books"
+      >
+        <button
+          className="btn-secondary-action"
+          onClick={() => handleBulkGenerate(false)}
+          disabled={isGenerating}
+        >
+          ⚡ Bulk Missing Codes
+        </button>
+        <button
+          className="add-btn"
+          onClick={() => handleBulkGenerate(true)}
+          disabled={isGenerating}
+          style={{ gap: '0.5rem', display: 'flex', alignItems: 'center' }}
+        >
+          🔄 Bulk Regenerate All
+        </button>
+      </PageHeader>
 
       {bulkStatus && (
         <div style={{ padding: '0.85rem 1rem', background: '#eff6ff', color: '#1e40af', borderRadius: '8px', marginBottom: '1.25rem', border: '1px solid #bfdbfe' }}>
@@ -159,16 +158,17 @@ const BarcodeManagement = () => {
         <div className="scanner-header">
           <h3>📷 Search Book using Barcode / QR Scan</h3>
         </div>
-        <form onSubmit={handleScanSearch} className="scanner-input-group">
-          <input
-            type="text"
-            className="scanner-input"
-            placeholder="Scan USB barcode reader or type Barcode / QR value..."
-            value={scanInput}
-            onChange={(e) => setScanInput(e.target.value)}
-            autoFocus
-          />
-          <button type="submit" className="btn-primary-action">
+        <form onSubmit={handleScanSearch} className="scanner-input-group" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div className="premium-input-wrapper no-icon" style={{ flex: '1' }}>
+            <input
+              type="text"
+              placeholder="Scan USB barcode reader or type Barcode / QR value..."
+              value={scanInput}
+              onChange={(e) => setScanInput(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <button type="submit" className="add-btn" style={{ padding: '0.55rem 1.25rem', whiteSpace: 'nowrap' }}>
             Search Code
           </button>
         </form>
@@ -193,14 +193,15 @@ const BarcodeManagement = () => {
       </div>
 
       {/* Catalog Search & Grid */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <input
-          type="text"
-          placeholder="Filter by title, author, barcode or QR..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{ width: '100%', maxWidth: '400px', padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-        />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', marginTop: '2rem' }}>
+        <div className="premium-input-wrapper no-icon" style={{ width: '100%', maxWidth: '400px' }}>
+          <input
+            type="text"
+            placeholder="Filter by title, author, barcode or QR..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
         <span style={{ fontSize: '0.9rem', color: '#64748b' }}>Showing {filteredBooks.length} books</span>
       </div>
 

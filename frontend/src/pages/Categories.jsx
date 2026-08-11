@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../services/api';
 import { Layers, FileText, Settings, X, AlertTriangle } from 'lucide-react';
+import { PageHeader } from '../components/layout/EnterpriseLibrary';
 import './Categories.css';
 
 const Categories = () => {
@@ -136,14 +137,12 @@ const Categories = () => {
 
   return (
     <div className="premium-page-wrapper">
-      <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
-        <PageHeader
+      <PageHeader
           title="Category Management"
           actions={
             <button className="add-btn" onClick={handleAdd}>Add New Category</button>
           }
         />
-      </div>
 
       {/* Advanced Filters Panel */}
       <div style={{ background: '#ffffff', border: '1px solid rgba(226,211,179,0.5)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: 'var(--shadow-soft)' }}>
@@ -362,4 +361,6 @@ const Categories = () => {
 };
 
 export default Categories;
+
+
 

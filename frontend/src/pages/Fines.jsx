@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getFines, payFine } from '../services/api';
 import { formatIST } from '../utils/dateUtils';
 import { PageHeader, DataTable } from '../components/layout/EnterpriseLibrary';
-import '../styles/design-tokens.css';
+
 import './Dashboard.css';
 
 const Fines = () => {
@@ -67,21 +67,19 @@ const Fines = () => {
   return (
     <div className="premium-page-wrapper" style={{ padding: '2rem' }}>
       {/* ── PageHeader Component Migration ── */}
-      <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--eu-color-border-main)', paddingBottom: '1.25rem' }}>
-        <PageHeader
-          title="Fine Management"
-          subtitle="Late return fee logs"
-        />
-      </div>
+      <PageHeader
+        title="Fine Management"
+        subtitle="Late return fee logs"
+      />
 
       {error && (
-        <div style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fee2e2', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
+        <div className="error-alert" style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fee2e2', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
           {error}
         </div>
       )}
 
       {success && (
-        <div style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #dcfce7', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
+        <div className="success-alert" style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #dcfce7', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
           {success}
         </div>
       )}
@@ -102,7 +100,7 @@ const Fines = () => {
         </button>
       </div>
 
-      <div className="info-card" style={{ background: '#ffffff', borderRadius: '16px', padding: '2rem', border: '1px solid rgba(226,211,179,0.55)' }}>
+      <div className="table-container" style={{ background: '#ffffff', borderRadius: '16px', padding: '2rem', border: '1px solid rgba(226,211,179,0.55)', boxShadow: '0 10px 30px rgba(0,0,0,0.02)' }}>
         {(() => {
           const columns = [];
           if (isAdmin) {
@@ -141,15 +139,18 @@ const Fines = () => {
                     onClick={() => handlePay(row.id)}
                     disabled={payingId === row.id || isDynamic}
                     style={{
-                      background: isDynamic ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)',
-                      color: '#ffffff',
-                      border: 'none',
+                      background: isDynamic ? '#f8fafc' : '#fffdf9',
+                      color: isDynamic ? '#94a3b8' : '#16a34a',
+                      border: `1px solid ${isDynamic ? '#cbd5e1' : 'rgba(22, 163, 74, 0.3)'}`,
                       padding: '0.5rem 1rem',
                       borderRadius: '8px',
                       fontWeight: '600',
                       cursor: isDynamic ? 'not-allowed' : 'pointer',
-                      opacity: payingId === row.id ? 0.7 : 1
+                      opacity: payingId === row.id ? 0.7 : 1,
+                      transition: 'all 0.2s'
                     }}
+                    onMouseEnter={(e) => { if(!isDynamic) { e.currentTarget.style.background = '#f0fdf4'; e.currentTarget.style.borderColor = '#16a34a'; } }}
+                    onMouseLeave={(e) => { if(!isDynamic) { e.currentTarget.style.background = '#fffdf9'; e.currentTarget.style.borderColor = 'rgba(22, 163, 74, 0.3)'; } }}
                     title={isDynamic ? 'Please return the book first to pay the fine' : ''}
                   >
                     {payingId === row.id ? 'Processing...' : (isDynamic ? 'Return Book First' : 'Pay Fine')}
@@ -174,4 +175,5 @@ const Fines = () => {
 };
 
 export default Fines;
+
 

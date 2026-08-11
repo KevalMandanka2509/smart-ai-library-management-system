@@ -19,6 +19,8 @@ import {
 import './Students.css';
 import './Dashboard.css';
 
+import { PageHeader } from '../components/layout/EnterpriseLibrary';
+
 const Settings = () => {
   const userStr = localStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
@@ -201,29 +203,27 @@ const Settings = () => {
   const currentSettings = settings || {};
 
   return (
-    <div className="dashboard-wrapper" style={{ width: '100%', padding: '2rem 3rem' }}>
-      {/* ── Header ── */}
-      <header className="dashboard-header-bar" style={{ marginBottom: '1.5rem' }}>
-        <div className="header-meta">
-          <h2>System Configurations & Administration</h2>
-          <span className="header-role-badge">Global Settings Terminal</span>
-        </div>
-      </header>
+    <div className="premium-page-wrapper">
+      {/* ── PageHeader Component Migration ── */}
+      <PageHeader
+        title="System Configurations & Administration"
+        subtitle="Global Settings Terminal"
+      />
 
       {error && (
-        <div style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', padding: '1rem 1.25rem', borderRadius: '12px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
+        <div className="error-alert" style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fee2e2', padding: '1rem 1.25rem', borderRadius: '12px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
           {error}
         </div>
       )}
 
       {success && (
-        <div style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #dcfce7', padding: '1rem 1.25rem', borderRadius: '12px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
+        <div className="success-alert" style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #dcfce7', padding: '1rem 1.25rem', borderRadius: '12px', marginBottom: '1.5rem', fontWeight: 'bold' }}>
           {success}
         </div>
       )}
 
       {/* ── Navigation Tabs ── */}
-      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      <div className="premium-tab-container">
         {[
           ['general', 'General'],
           ['library', 'Library Rules'],
@@ -239,20 +239,14 @@ const Settings = () => {
           <button
             key={tab}
             onClick={() => { setActiveTab(tab); setError(''); setSuccess(''); }}
-            style={{
-              padding: '0.6rem 1.1rem', borderRadius: '8px', border: 'none',
-              background: activeTab === tab ? '#D4A017' : '#f1f5f9',
-              color: activeTab === tab ? '#ffffff' : '#5c5549',
-              fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
+            className={`premium-tab ${activeTab === tab ? 'active' : ''}`}
           >
             {label}
           </button>
         ))}
       </div>
 
-      <div style={{ background: '#ffffff', borderRadius: '16px', padding: '2.25rem', border: '1px solid rgba(226,211,179,0.55)', boxShadow: '0 6px 20px rgba(20,18,15,0.03)' }}>
+      <div className="table-container" style={{ background: '#ffffff', borderRadius: '16px', padding: '2.25rem', border: '1px solid rgba(226,211,179,0.55)', boxShadow: '0 10px 30px rgba(0,0,0,0.02)' }}>
         
         {/* ════════════════════════════════════════
             TAB 1: GENERAL

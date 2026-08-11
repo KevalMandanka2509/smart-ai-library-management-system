@@ -6,7 +6,7 @@ import {
 import { RefreshCw, Trash2, Search, History, AlertTriangle, Book, Users, Tags, GraduationCap, DollarSign, Database, Calendar } from 'lucide-react';
 import { PageHeader, DataTable, StatusBadge } from '../components/layout/EnterpriseLibrary';
 import { formatIST } from '../utils/dateUtils';
-import '../styles/design-tokens.css';
+
 import './RecycleBin.css';
 
 const TABS = [
@@ -198,7 +198,7 @@ const RecycleBin = () => {
   ], [activeTab, handleRestore, handlePermanentDelete]);
 
   return (
-    <div className="eu-container" style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
+    <div className="premium-page-wrapper">
       <PageHeader 
         title="Recycle Bin" 
         subtitle="Manage soft-deleted records, restore them, or delete them permanently."
@@ -222,9 +222,9 @@ const RecycleBin = () => {
         }
       />
 
-      {error && <div className="eu-alert eu-alert-danger" style={{ marginBottom: '1rem', padding: '1rem', background: '#fee2e2', color: '#991b1b', borderRadius: '4px' }}>{error}</div>}
+      {error && <div className="error-alert" style={{ marginBottom: '1.5rem', padding: '1rem', background: '#fef2f2', color: '#b91c1c', borderRadius: '8px', border: '1px solid #fee2e2', fontWeight: 'bold' }}>{error}</div>}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="search-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff', border: '1px solid rgba(226,211,179,0.5)', borderRadius: '16px', padding: '1.5rem', boxShadow: 'var(--shadow-soft)' }}>
         <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '4px' }}>
           {TABS.map(tab => (
             <button
@@ -239,7 +239,7 @@ const RecycleBin = () => {
                 display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.2rem',
                 background: activeTab === tab.id ? 'var(--eu-color-primary)' : '#fff',
                 color: activeTab === tab.id ? '#fff' : 'var(--eu-color-text-main)',
-                border: activeTab === tab.id ? '1px solid var(--eu-color-primary)' : '1px solid #e2d3b3',
+                border: activeTab === tab.id ? '1px solid var(--eu-color-primary)' : '1px solid rgba(226,211,179,0.5)',
                 borderRadius: '8px', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s',
                 whiteSpace: 'nowrap'
               }}
@@ -249,19 +249,20 @@ const RecycleBin = () => {
           ))}
         </div>
 
-        <form onSubmit={handleSearch} style={{ flex: '0 1 350px', display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid #e2d3b3', borderRadius: '8px', padding: '0.5rem' }}>
-          <Search size={18} style={{ color: '#9ca3af' }} />
-          <input
-            type="text"
-            placeholder={`Search ${TABS.find(t => t.id === activeTab)?.label.toLowerCase()}...`}
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            style={{ border: 'none', outline: 'none', width: '100%', marginLeft: '0.5rem' }}
-          />
+        <form onSubmit={handleSearch} style={{ flex: '0 1 350px' }}>
+          <div className="premium-input-wrapper">
+            <Search className="premium-input-icon" size={18} />
+            <input
+              type="text"
+              placeholder={`Search ${TABS.find(t => t.id === activeTab)?.label.toLowerCase()}...`}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
         </form>
       </div>
 
-      <div className="eu-card" style={{ background: '#fff', borderRadius: '8px', border: '1px solid #e2d3b3', overflow: 'hidden' }}>
+      <div className="table-container" style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid rgba(226,211,179,0.55)', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.02)', padding: '2rem' }}>
         <DataTable 
           columns={columns} 
           data={records} 
@@ -299,3 +300,4 @@ const RecycleBin = () => {
 };
 
 export default RecycleBin;
+
