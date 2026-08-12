@@ -10,6 +10,8 @@ class Settings:
     APP_NAME: str = os.getenv("APP_NAME", "Smart AI Library Management System")
     APP_VERSION: str = os.getenv("APP_VERSION", "1.0.0")
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+
     
     # ===== MongoDB Settings =====
     MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://127.0.0.1:27017")

@@ -23,7 +23,8 @@ from .routes import (
     barcodes_router,
     sms_router,
     recycle_bin_router,
-    contact_router
+    contact_router,
+    ai_chat_router
 )
 from .core.security_middleware import SecurityHeadersMiddleware, RateLimiterMiddleware
 import logging
@@ -148,6 +149,7 @@ app.include_router(barcodes_router)
 app.include_router(sms_router)
 app.include_router(recycle_bin_router)
 app.include_router(contact_router)
+app.include_router(ai_chat_router)
 
 # ===== Root Endpoint =====
 @app.get("/")

@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Download, FileText, ArrowUpRight } from 'lucide-react';
 
 const ExecutiveReport = ({ summary, trend }) => {
@@ -6,9 +6,9 @@ const ExecutiveReport = ({ summary, trend }) => {
     window.print();
   };
 
-  const currencyFormatter = new Intl.NumberFormat('en-US', {
+  const currencyFormatter = new Intl.NumberFormat('en-IN', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'INR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   });

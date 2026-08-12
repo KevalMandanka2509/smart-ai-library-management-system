@@ -6,6 +6,7 @@ import Footer from './components/layout/Footer';
 import { getMyProfile } from './services/api';
 import './App.css';
 import './styles/design-tokens.css';
+import Chatbot from './components/Chatbot';
 
 // Global Error Boundary Component
 class ErrorBoundary extends Component {
@@ -108,6 +109,7 @@ const ProtectedLayout = ({ isLoggedIn, userRole, handleLogout }) => {
       <main className="app-main">
         <Outlet />
       </main>
+      <Chatbot />
     </div>
   );
 };

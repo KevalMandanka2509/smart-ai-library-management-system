@@ -739,4 +739,67 @@ export const scheduleReport = async (payload) => {
   return data;
 };
 
+// ===== AI Chatbot API =====
+export const sendChatMessage = async (message, history = [], sessionId = null, file = null) => {
+  const formData = new FormData();
+  formData.append('message', message);
+  formData.append('history', JSON.stringify(history));
+  if (sessionId) formData.append('session_id', sessionId);
+  if (file) formData.append('file', file);
+
+  const response = await api.post('/ai/chat', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000
+  });
+  return response.data;
+};
+
+export const streamChatMessage = async (message, history = [], sessionId = null, file = null, onChunk, onDone, onError) => {
+  const formData = new FormData();
+  formData.append('message', message);
+  formData.append('history', JSON.stringify(history));
+  if (sessionId) formData.append('session_id', sessionId);
+  if (file) formData.append('file', file);
+
+  const token = localStorage.getItem('access_token');
+  const baseURL = api.defaults.baseURL || 'http://127.0.0.1:8000/api/v1';
+
+  try {
+    const response = await fetch(`${baseURL}/ai/chat`, {
+      method: 'POST',
+      body: formData,
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+    }
+    
+    const returnedSessionId = response.headers.get('X-Session-ID') || sessionId;
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    
+    let fullText = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        if (onDone) onDone(returnedSessionId, fullText);
+        break;
+      }
+      const chunk = decoder.decode(value, { stream: true });
+      fullText += chunk;
+      if (onChunk) onChunk(chunk);
+    }
+  } catch (error) {
+    if (onError) onError(error);
+  }
+};
+
+export const getChatSessions = async () => {
+  const response = await api.get('/ai/sessions');
+  return response.data;
+};
+
 export default api;

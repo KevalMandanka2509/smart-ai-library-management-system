@@ -19,6 +19,7 @@ from .sms_route import router as sms_router
 from .recycle_bin import router as recycle_bin_router
 from .recommendations import router as recommendations_router
 from .contact import router as contact_router
+from .ai_chat import router as ai_chat_router
 
 # Export all routers
 __all__ = [
@@ -42,5 +43,6 @@ __all__ = [
     "sms_router",
     "recycle_bin_router",
     "recommendations_router",
-    "contact_router"
+    "contact_router",
+    "ai_chat_router"
 ]

@@ -7,7 +7,6 @@ import './Dashboard.css';
 import SavedReports from '../components/reports/SavedReports';
 import ReportScheduler from '../components/reports/ReportScheduler';
 import AIReportAssistant from '../components/reports/AIReportAssistant';
-import ActivityHeatmap from '../components/reports/ActivityHeatmap';
 import ExecutiveReport from '../components/reports/ExecutiveReport';
 import FinancialAnalytics from '../components/reports/FinancialAnalytics';
 import { BorrowActivityHeatmap } from '../components/DashboardCharts';
@@ -157,9 +156,9 @@ function exportHTML(title, headers, rows, filename) {
 // Tab button
 // ─────────────────────────────────────────────────────────────
 const TabBtn = ({ label, active, onClick, count }) => (
-  <button 
+  <button
     className={`premium-tab ${active ? 'active' : ''}`}
-    onClick={onClick} 
+    onClick={onClick}
     style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
   >
     {label}
@@ -308,16 +307,16 @@ const Reports = () => {
   return (
     <div className="premium-page-wrapper">
       {/* ── Header ── */}
-      <PageHeader 
-        title="Analytical Reports" 
+      <PageHeader
+        title="Analytical Reports"
         subtitle={`${granularity.charAt(0).toUpperCase() + granularity.slice(1)} · Last ${period} periods`}
       >
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="premium-tab-container" style={{ padding: '0.2rem' }}>
             {GRANULARITIES.map(g => (
-              <button 
-                key={g.value} 
-                onClick={() => handleGranChange(g.value)} 
+              <button
+                key={g.value}
+                onClick={() => handleGranChange(g.value)}
                 className={`premium-tab ${granularity === g.value ? 'active' : ''}`}
                 style={{ padding: '0.35rem 0.8rem', minWidth: 'auto' }}
               >
@@ -357,15 +356,15 @@ const Reports = () => {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.2rem', marginTop: '1.5rem' }}>
         <SummaryCard label="Total Issues" value={summary.total_issues ?? 0} color="#3b82f6"
-          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>} />
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>} />
         <SummaryCard label="Total Returns" value={summary.total_returns ?? 0} color="#16a34a"
-          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>} />
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>} />
         <SummaryCard label="Overdue" value={summary.overdue ?? 0} color="#ea580c"
-          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>} />
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>} />
         <SummaryCard label="Fines Generated" value={`₹${summary.total_fines_generated ?? 0}`} color="#dc2626"
-          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>} />
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>} />
         <SummaryCard label="Fines Collected" value={`₹${summary.fines_collected ?? 0}`} color="#D4A017"
-          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>} />
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="7" /><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" /></svg>} />
       </div>
 
       {/* ── Tabs ── */}
@@ -381,15 +380,16 @@ const Reports = () => {
       ════════════════════════════════════════ */}
       {activeTab === 'overview' && (
         <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <ExecutiveReport summary={summary} trend={trend} />
           {/* Calendar Heatmap Wrapper */}
           {trend.length > 0 && (
-             <div className="chart-print-wrapper" style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
-               <BorrowActivityHeatmap trend={{
-                  labels: trend.map(t => t.period),
-                  issues: trend.map(t => t.issues),
-                  returns: trend.map(t => t.returns)
-               }} />
-             </div>
+            <div className="chart-print-wrapper" style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
+              <BorrowActivityHeatmap trend={{
+                labels: trend.map(t => t.period),
+                issues: trend.map(t => t.issues),
+                returns: trend.map(t => t.returns)
+              }} />
+            </div>
           )}
           {/* Trend Chart */}
           <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.75rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
@@ -661,6 +661,15 @@ const Reports = () => {
               Total: ₹{filteredFines.reduce((s, f) => s + (f.amount || 0), 0).toFixed(2)}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════
+          TAB: ENTERPRISE AI & AUTOMATION
+      ════════════════════════════════════════ */}
+      {activeTab === 'ai_automation' && (
+        <div style={{ marginTop: '1.5rem' }}>
+          <AIReportAssistant onLoadReport={handleLoadSavedReport} />
         </div>
       )}
     </div>
