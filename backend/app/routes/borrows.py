@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from datetime import datetime, timedelta
 from bson import ObjectId
+import asyncio
+from ..utils.notification_helper import create_notification
 from typing import List, Optional
 
 from ..database import get_db
@@ -34,6 +36,10 @@ async def issue_book(request: BorrowIssueRequest, db=Depends(get_db), current_us
     """
     Issue a book to a student.
     """
+    # P1-11: Read library settings
+    from ..utils.settings_helper import get_library_settings
+    lib_settings = get_library_settings(db)
+    
     # 1. Verify student exists and is active
     student = db.students.find_one({"student_id": request.student_id})
     if not student:
@@ -44,16 +50,28 @@ async def issue_book(request: BorrowIssueRequest, db=Depends(get_db), current_us
     if not student.get("is_active", True):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Student account is disabled"
+            detail="Student account is disabled"
         )
 
-    # 1b. Check for unpaid fines
-    unpaid_fine = db.fines.find_one({"student_id": request.student_id, "paid": False})
-    if unpaid_fine:
+    # P1-11: Enforce max_books_per_student
+    active_borrows_count = db.borrows.count_documents({"student_id": request.student_id, "status": "issued"})
+    max_books = lib_settings["max_books_per_student"]
+    if active_borrows_count >= max_books:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Student has unpaid fines. Please clear them before issuing a book."
+            detail=f"Student has reached the maximum borrow limit ({max_books} books). Return a book first."
         )
+
+    # P1-11: Check for unpaid fines with threshold enforcement
+    if lib_settings["block_borrow_on_unpaid_fine"]:
+        pipeline = [{"$match": {"student_id": request.student_id, "paid": False}}, {"$group": {"_id": None, "total": {"$sum": "$amount"}}}]
+        fine_result = list(db.fines.aggregate(pipeline))
+        total_unpaid = fine_result[0]["total"] if fine_result else 0
+        if total_unpaid > lib_settings["max_fine_limit_for_borrow"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Student has unpaid fines ({lib_settings['currency_symbol']}{total_unpaid:.2f}) exceeding the limit ({lib_settings['currency_symbol']}{lib_settings['max_fine_limit_for_borrow']:.2f}). Please clear them first."
+            )
 
     book_filter = {}
     if ObjectId.is_valid(request.book_id):
@@ -147,19 +165,33 @@ async def issue_book(request: BorrowIssueRequest, db=Depends(get_db), current_us
             )
 
     # 7. Insert transaction record (failure-safe: rollback inventory on error)
+    # P1-11: Use default_borrow_days from settings
+    borrow_days = lib_settings["default_borrow_days"]
     new_borrow = {
         "student_id": request.student_id,
         "student_name": student["full_name"],
         "book_id": str(book["_id"]),
         "book_title": book["title"],
         "issue_date": datetime.utcnow(),
-        "due_date": datetime.utcnow() + timedelta(days=14),
+        "due_date": datetime.utcnow() + timedelta(days=borrow_days),
         "return_date": None,
-        "status": "issued"
+        "status": "issued",
+        "renew_count": 0
     }
     
+    from pymongo.errors import DuplicateKeyError
     try:
         db.borrows.insert_one(new_borrow)
+    except DuplicateKeyError:
+        # P1-7: Concurrent duplicate caught by unique partial index
+        if ready_res:
+            db.reservations.update_one({"_id": ready_res["_id"]}, {"$set": {"status": "ready"}})
+        else:
+            db.books.update_one({"_id": book["_id"]}, {"$inc": {"available_copies": 1}, "$set": {"is_available": True}})
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This book is already issued to this student"
+        )
     except Exception as insert_err:
         # Rollback: restore inventory or reservation status
         if ready_res:
@@ -178,27 +210,17 @@ async def issue_book(request: BorrowIssueRequest, db=Depends(get_db), current_us
         )
 
     # 7. Trigger notification & email
-    from ..utils.notification_helper import create_notification
-    from ..services.email_service import EmailService
-    import asyncio
-
     asyncio.create_task(create_notification(
         db,
         student_id=request.student_id,
         title="Book Issued Successfully",
         message=f"You have borrowed '{book['title']}'. Due date is {new_borrow['due_date'].strftime('%Y-%m-%d')}.",
-        n_type="issue_success"
+        n_type="issue_success",
+        student_name=student.get("full_name", request.student_id),
+        book_title=book["title"],
+        issue_date=new_borrow["issue_date"].strftime("%Y-%m-%d"),
+        due_date=new_borrow["due_date"].strftime("%Y-%m-%d")
     ))
-
-    if student.get("email"):
-        asyncio.create_task(EmailService.send_issue_confirmation(
-            recipient_email=student["email"],
-            student_name=student.get("full_name", request.student_id),
-            book_title=book["title"],
-            issue_date=new_borrow["issue_date"].strftime("%Y-%m-%d"),
-            due_date=new_borrow["due_date"].strftime("%Y-%m-%d"),
-            db=db
-        ))
 
     return {"message": f"Book '{book['title']}' successfully issued to '{student['full_name']}'"}
 
@@ -250,19 +272,30 @@ async def return_book(request: BorrowReturnRequest, db=Depends(get_db), current_
             detail="No active borrow record found for this student and book. It may have already been returned."
         )
 
-    # 2. Calculate late fine
+    # P1-11/13: Calculate late fine with settings enforcement
+    from ..utils.settings_helper import get_library_settings
+    lib_settings = get_library_settings(db)
     fine_amount = 0.0
+    overdue_days = 0
     due_date = borrow["due_date"]
+    grace_days = lib_settings["grace_period_days"]
+    
     if now > due_date:
-        overdue_days = (now - due_date).days
-        if overdue_days == 0 and (now - due_date).total_seconds() > 0:
-            overdue_days = 1
+        raw_overdue_days = (now - due_date).days
+        if raw_overdue_days == 0 and (now - due_date).total_seconds() > 0:
+            raw_overdue_days = 1
+        # P1-11: Apply grace period
+        overdue_days = max(0, raw_overdue_days - grace_days)
         if overdue_days > 0:
-            from ..utils.fine_config import get_fine_rate
-            fine_rate = get_fine_rate(db)
+            fine_rate = lib_settings["daily_fine_rate"]
             fine_amount = overdue_days * fine_rate
+            # P1-13: Cap fine at max_fine_per_book
+            max_fine = lib_settings["max_fine_per_book"]
+            if fine_amount > max_fine:
+                fine_amount = max_fine
 
     # 4. Save fine record if applicable
+    currency = lib_settings["currency_symbol"]
     if fine_amount > 0:
         db.fines.insert_one({
             "borrow_id": str(borrow["_id"]),
@@ -270,7 +303,7 @@ async def return_book(request: BorrowReturnRequest, db=Depends(get_db), current_
             "student_name": borrow.get("student_name", "Unknown Student"),
             "book_title": borrow.get("book_title", "Unknown Book"),
             "amount": fine_amount,
-            "reason": f"Overdue return ({overdue_days} day(s) late)",
+            "reason": f"Overdue return ({overdue_days} day(s) late, {grace_days}-day grace applied)",
             "created_at": now,
             "paid": False,
             "paid_at": None
@@ -279,7 +312,7 @@ async def return_book(request: BorrowReturnRequest, db=Depends(get_db), current_
     # 5. Check reservation queue atomically
     oldest_res = db.reservations.find_one_and_update(
         {"book_id": str(book["_id"]), "status": "pending"},
-        {"$set": {"status": "ready"}},
+        {"$set": {"status": "ready", "ready_at": now}},
         sort=[("reserved_at", 1)]
     )
     
@@ -310,45 +343,105 @@ async def return_book(request: BorrowReturnRequest, db=Depends(get_db), current_
         msg = f"Book '{book['title']}' successfully returned."
 
     # Notify borrower of return success & send return confirmation email
+    student = db.students.find_one({"student_id": request.student_id})
+    
     asyncio.create_task(create_notification(
         db,
         student_id=request.student_id,
         title="Book Returned Successfully",
         message=f"Book '{book['title']}' has been returned.",
-        n_type="return_success"
+        n_type="return_success",
+        student_name=student.get("full_name", request.student_id) if student else request.student_id,
+        book_title=book["title"],
+        return_date=now.strftime("%Y-%m-%d %H:%M")
     ))
-
-    student = db.students.find_one({"student_id": request.student_id})
-    if student and student.get("email"):
-        asyncio.create_task(EmailService.send_return_confirmation(
-            recipient_email=student["email"],
-            student_name=student.get("full_name", request.student_id),
-            book_title=book["title"],
-            return_date=now.strftime("%Y-%m-%d %H:%M"),
-            db=db
-        ))
-        if fine_amount > 0:
-            asyncio.create_task(EmailService.send_fine_reminder(
-                recipient_email=student["email"],
-                student_name=student.get("full_name", request.student_id),
-                book_title=book["title"],
-                amount=fine_amount,
-                reason="Late Book Return",
-                db=db
-            ))
 
     # Notify borrower of late fine if generated
     if fine_amount > 0:
-        msg += f" Late return fine of {fine_amount} units generated."
+        msg += f" Late return fine of {currency}{fine_amount:.2f} generated."
         asyncio.create_task(create_notification(
             db,
             student_id=request.student_id,
             title="Overdue Fine Generated",
-            message=f"A late fee of ${fine_amount:.2f} has been generated for returning '{book['title']}' late.",
-            n_type="fine_reminder"
+            message=f"A late fee of {currency}{fine_amount:.2f} has been generated for returning '{book['title']}' late.",
+            n_type="fine_reminder",
+            student_name=student.get("full_name", request.student_id) if student else request.student_id,
+            book_title=book["title"],
+            amount=fine_amount,
+            reason="Late Book Return"
         ))
 
     return {"message": msg}
+
+# ============================================
+# 2b. RENEW BOOK (P1-12)
+# ============================================
+@router.post("/renew", response_model=dict)
+async def renew_book(request: BorrowIssueRequest, db=Depends(get_db), current_user=Depends(get_current_user)):
+    """
+    Renew an active borrow. Extends the due date.
+    """
+    from ..utils.settings_helper import get_library_settings
+    lib_settings = get_library_settings(db)
+    
+    if not lib_settings["allow_renewals"]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Book renewals are currently disabled.")
+    
+    # Authorization: members can only renew their own borrows
+    student_id = request.student_id
+    if current_user.get("role") == "member":
+        if student_id != current_user.get("username"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only renew your own borrows.")
+    
+    # Find the active borrow
+    book_id = request.book_id
+    borrow_filter = {"student_id": student_id, "status": "issued"}
+    if ObjectId.is_valid(book_id):
+        borrow_filter["book_id"] = book_id
+    else:
+        # Try to resolve book_id from ISBN/barcode
+        book = db.books.find_one({"$or": [{"isbn": book_id}, {"barcode_value": book_id}]})
+        if book:
+            borrow_filter["book_id"] = str(book["_id"])
+        else:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+    
+    borrow = db.borrows.find_one(borrow_filter)
+    if not borrow:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active borrow found for this book.")
+    
+    # Check renew count
+    renew_count = borrow.get("renew_count", 0)
+    max_renewals = lib_settings["max_renew_count"]
+    if renew_count >= max_renewals:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Maximum renewal limit ({max_renewals}) reached.")
+    
+    # Check if book is overdue — don't allow renewal if overdue
+    if borrow["due_date"] < datetime.utcnow():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot renew an overdue book. Please return it first.")
+    
+    # Check for conflicting reservations
+    actual_book_id = borrow["book_id"]
+    pending_res = db.reservations.find_one({"book_id": actual_book_id, "status": {"$in": ["pending", "ready"]}})
+    if pending_res:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot renew — there are active reservations for this book.")
+    
+    # Extend due date
+    new_due = borrow["due_date"] + timedelta(days=lib_settings["default_borrow_days"])
+    from pymongo import ReturnDocument
+    updated = db.borrows.find_one_and_update(
+        {"_id": borrow["_id"], "status": "issued"},
+        {"$set": {"due_date": new_due}, "$inc": {"renew_count": 1}},
+        return_document=ReturnDocument.AFTER
+    )
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Renewal failed. Borrow may have been returned.")
+    
+    return {
+        "message": f"Book renewed successfully. New due date: {new_due.strftime('%Y-%m-%d')}",
+        "new_due_date": new_due.isoformat(),
+        "renew_count": updated.get("renew_count", renew_count + 1)
+    }
 
 # ============================================
 # 3. LIST ALL TRANSACTIONS (Admin Only - Filtered, Sorted, Paginated)
@@ -459,7 +552,7 @@ async def bulk_return_books(
         # 5. Check reservation queue atomically
         oldest_res = db.reservations.find_one_and_update(
             {"book_id": str(book["_id"]), "status": "pending"},
-            {"$set": {"status": "ready"}},
+            {"$set": {"status": "ready", "ready_at": now}},
             sort=[("reserved_at", 1)]
         )
         

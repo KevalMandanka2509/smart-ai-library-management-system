@@ -15,9 +15,12 @@ def category_document(data: dict) -> dict:
 
 def serialize_category(category: dict) -> dict:
     """Convert MongoDB document to dict with string id"""
-    if category and "_id" in category:
-        category["id"] = str(category["_id"])
-        del category["_id"]
+    if category:
+        if "_id" in category:
+            category["id"] = str(category["_id"])
+            del category["_id"]
+        category.setdefault("created_at", datetime.utcnow())
+        category.setdefault("updated_at", datetime.utcnow())
     return category
 
 

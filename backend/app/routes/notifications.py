@@ -24,7 +24,7 @@ def serialize_notification(n) -> dict:
 # ============================================
 @router.get("/", response_model=List[dict])
 async def get_notifications(db=Depends(get_db), current_user=Depends(get_current_user)):
-    is_admin = current_user.get("role") == "admin"
+    is_admin = current_user.get("role") in ["admin", "librarian"]
     query = {}
     
     if not is_admin:
@@ -45,7 +45,7 @@ async def mark_as_read(id: str, db=Depends(get_db), current_user=Depends(get_cur
     if not n:
         raise HTTPException(status_code=404, detail="Notification not found")
         
-    is_admin = current_user.get("role") == "admin"
+    is_admin = current_user.get("role") in ["admin", "librarian"]
     if not is_admin and n["student_id"] != current_user.get("username"):
         raise HTTPException(status_code=403, detail="Unauthorized")
 
@@ -60,7 +60,7 @@ async def mark_as_read(id: str, db=Depends(get_db), current_user=Depends(get_cur
 # ============================================
 @router.post("/read-all", response_model=dict)
 async def mark_all_read(db=Depends(get_db), current_user=Depends(get_current_user)):
-    is_admin = current_user.get("role") == "admin"
+    is_admin = current_user.get("role") in ["admin", "librarian"]
     query = {}
     if not is_admin:
         query["student_id"] = current_user.get("username")
@@ -80,7 +80,7 @@ async def delete_notification(id: str, db=Depends(get_db), current_user=Depends(
     if not n:
         raise HTTPException(status_code=404, detail="Notification not found")
         
-    is_admin = current_user.get("role") == "admin"
+    is_admin = current_user.get("role") in ["admin", "librarian"]
     if not is_admin and n["student_id"] != current_user.get("username"):
         raise HTTPException(status_code=403, detail="Unauthorized")
 

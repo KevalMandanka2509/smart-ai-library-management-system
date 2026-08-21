@@ -73,27 +73,27 @@ class SmsService:
         }
 
     @classmethod
-    def _send_sync(cls, phone: str, message: str, config: Dict[str, Any]) -> bool:
+    def _send_sync(cls, phone: str, message: str, config: Dict[str, Any]) -> str:
         """Synchronous provider dispatch worker."""
         if not phone:
             logger.error("Recipient phone number is missing")
-            return False
+            return "failed"
 
-        # If provider is empty or mock, log simulation and return True
+        # If provider is empty or mock, log simulation and return "simulated"
         provider = config.get("provider", "").lower()
         if not provider or provider == "mock" or not config.get("api_key"):
             logger.info(f"📱 [SMS Simulation] To: {phone} | Msg: [REDACTED]")
             print(f"\n[SMS SIMULATION DISPATCH]\nTo: {phone}\nMessage: [REDACTED]\nProvider: MOCK/SIMULATION\n")
-            return True
+            return "simulated"
 
         # Twilio, Vonage, MSG91 integration simulation using requests/httpx pattern
         try:
             logger.info(f"📱 Calling SMS Provider {provider} for {phone}")
             print(f"\n[SMS DISPATCH VIA PROVIDER: {provider}]\nTo: {phone}\nMessage: [REDACTED]\n")
-            return True
+            return "sent"
         except Exception as e:
             logger.error(f"❌ Failed to dispatch SMS to {phone} via {provider}: {e}")
-            return False
+            return "failed"
 
     @classmethod
     async def send_sms_async(
@@ -106,22 +106,23 @@ class SmsService:
     ) -> bool:
         """Asynchronous non-blocking SMS dispatch with MongoDB history logging."""
         config = cls.get_sms_config(db)
-        success = await asyncio.to_thread(cls._send_sync, phone, message, config)
+        status_str = await asyncio.to_thread(cls._send_sync, phone, message, config)
 
         if db is not None:
             try:
                 log_entry = {
-                    "recipient_phone": phone,
+                    "phone": phone,
                     "template_name": template_name,
                     "template_args": template_args or {},
-                    "status": "sent" if success else "failed",
+                    "status": status_str,
+                    "provider": config.get("provider", "mock"),
                     "dispatched_at": datetime.utcnow()
                 }
                 db.sms_logs.insert_one(log_entry)
             except Exception as e:
                 logger.warning(f"Failed to save SMS history log: {e}")
 
-        return success
+        return status_str in ["sent", "simulated"]
 
     # ─────────────────────────────────────────────────────────────
     # 3. OTP VERIFICATION ENGINE

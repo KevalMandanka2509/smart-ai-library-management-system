@@ -246,7 +246,7 @@ async def global_search(
     db=Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    is_admin = current_user.get("role") == "admin"
+    is_admin = current_user.get("role") in ["admin", "librarian"]
 
     book_filt = {
         "$or": [

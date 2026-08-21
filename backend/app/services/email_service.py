@@ -234,11 +234,11 @@ class EmailService:
         }
 
     @classmethod
-    def _send_sync(cls, recipient_email: str, subject: str, html_body: str, smtp_config: Dict[str, Any]) -> bool:
+    def _send_sync(cls, recipient_email: str, subject: str, html_body: str, smtp_config: Dict[str, Any]) -> str:
         """Synchronous SMTP mail delivery worker."""
         if not recipient_email or "@" not in recipient_email:
             logger.error(f"Invalid recipient email: '{recipient_email}'")
-            return False
+            return "failed"
 
         from_addr = f"{smtp_config['from_name']} <{smtp_config['from_email']}>"
 
@@ -248,11 +248,11 @@ class EmailService:
         msg["To"] = recipient_email
         msg.attach(MIMEText(html_body, "html"))
 
-        # If host is empty or mock, log simulation and return True
+        # If host is empty or mock, log simulation and return "simulated"
         if not smtp_config["host"] or smtp_config["host"] == "localhost" or not smtp_config["user"]:
             logger.info(f"📧 [Email Simulation] To: {recipient_email} | Subject: {subject}")
             print(f"\n[EMAIL SIMULATION DISPATCH]\nTo: {recipient_email}\nSubject: {subject}\nFrom: {from_addr}\n")
-            return True
+            return "simulated"
 
         try:
             with smtplib.SMTP(smtp_config["host"], smtp_config["port"], timeout=10) as server:
@@ -263,12 +263,12 @@ class EmailService:
                 server.sendmail(smtp_config["from_email"], [recipient_email], msg.as_string())
 
             logger.info(f"✅ Email successfully delivered to {recipient_email}")
-            return True
+            return "sent"
         except Exception as e:
             logger.error(f"❌ Failed to dispatch email to {recipient_email}: {e}")
             # Non-blocking simulation fallback on network failure
             print(f"\n[EMAIL DISPATCH FALLBACK LOG]\nTo: {recipient_email}\nSubject: {subject}\nError: {e}\n")
-            return False
+            return "failed"
 
     @classmethod
     async def send_email_async(
@@ -282,7 +282,7 @@ class EmailService:
     ) -> bool:
         """Asynchronous non-blocking email dispatch with MongoDB history logging."""
         smtp_config = cls.get_smtp_config(db)
-        success = await asyncio.to_thread(cls._send_sync, recipient_email, subject, html_body, smtp_config)
+        status_str = await asyncio.to_thread(cls._send_sync, recipient_email, subject, html_body, smtp_config)
 
         # Log into email_logs collection in MongoDB if db is provided
         if db is not None:
@@ -292,14 +292,13 @@ class EmailService:
                     "subject": subject,
                     "template_name": template_name,
                     "template_args": template_args or {},
-                    "status": "sent" if success else "failed",
+                    "status": status_str,
                     "dispatched_at": datetime.utcnow()
                 }
                 db.email_logs.insert_one(log_entry)
             except Exception as e:
                 logger.warning(f"Failed to save email history log: {e}")
-
-        return success
+        return status_str in ["sent", "simulated"]
 
     @classmethod
     async def send_issue_confirmation(cls, recipient_email: str, student_name: str, book_title: str, issue_date: str, due_date: str, db=None):

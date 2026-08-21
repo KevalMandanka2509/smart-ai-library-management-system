@@ -62,6 +62,7 @@ class BookUpdate(BaseModel):
 # Book Response
 class BookResponse(BookBase):
     id: str  # Changed from int to str for MongoDB ObjectId
+    isbn: Optional[str] = None
     barcode_value: Optional[str] = None
     qr_value: Optional[str] = None
     is_available: bool

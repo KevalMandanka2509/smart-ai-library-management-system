@@ -16,9 +16,15 @@ def create_admin():
         print("[ERROR] DEFAULT_ADMIN_EMAIL and DEFAULT_ADMIN_PASSWORD must be set in environment variables")
         return
 
-    admin_email = settings.DEFAULT_ADMIN_EMAIL
+    admin_email = settings.DEFAULT_ADMIN_EMAIL.lower()
     admin_password = settings.DEFAULT_ADMIN_PASSWORD
     admin_username = admin_email.split('@')[0]
+    
+    # Ensure username is unique if email doesn't exist
+    existing_username = collection.find_one({"username": admin_username})
+    if existing_username and existing_username.get("email") != admin_email:
+        import time
+        admin_username = f"{admin_username}_{int(time.time())}"
 
     existing = collection.find_one({"email": admin_email})
     if existing:

@@ -46,7 +46,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         # Sensitive auth endpoints limit check
-        if path.startswith("/api/v1/auth/login") or path.startswith("/api/v1/auth/register") or path.startswith("/api/v1/auth/forgot-password"):
+        if path.startswith("/api/v1/auth/login") or path.startswith("/api/v1/auth/register") or path.startswith("/api/v1/auth/forgot-password") or path.startswith("/api/v1/sms/send-otp") or path.startswith("/api/v1/sms/verify-otp"):
             user_hits = self.auth_requests[client_ip]
             count = self._clean_and_count(user_hits, now)
             if count >= self.auth_limit:

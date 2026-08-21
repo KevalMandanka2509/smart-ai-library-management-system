@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 from contextlib import asynccontextmanager
 
+from .services.scheduler_service import start_scheduler, stop_scheduler
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize MongoDB (indexes are created inside Database._create_indexes)
@@ -44,11 +46,20 @@ async def lifespan(app: FastAPI):
         logger.info(f"✅ Connected to database: {settings.DATABASE_NAME}")
     except Exception as e:
         logger.error(f"❌ Database connection failed: {e}")
+        
+    # PRODUCTION LIMITATION: In a multi-worker setup (e.g. gunicorn/uvicorn with multiple workers),
+    # start_scheduler() will spawn an APScheduler in EVERY worker process.
+    # This will lead to duplicate scheduled tasks (e.g., duplicate emails, duplicate reports).
+    # For a real production deployment, either run a single worker, or extract the scheduler
+    # into a separate standalone worker process, or use a database-backed job queue like Celery.
+    start_scheduler()
+    logger.info("⏰ Background scheduler started")
     
     yield
     
     # Shutdown: Close resources
     logger.info("🛑 Shutting down application via lifespan...")
+    stop_scheduler()
     db.close()
 
 # Create FastAPI instance
@@ -172,11 +183,14 @@ async def health_check():
             "message": "All systems operational"
         }
     except Exception as e:
-        return {
-            "status": "unhealthy",
-            "database": "disconnected",
-            "error": str(e)
-        }
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "unhealthy",
+                "database": "disconnected",
+                "error": str(e)
+            }
+        )
 
 if __name__ == "__main__":
     import uvicorn

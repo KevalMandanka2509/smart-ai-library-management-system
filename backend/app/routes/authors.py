@@ -186,7 +186,8 @@ async def update_author(
     update_data = author_update.dict(exclude_unset=True)
 
     # Check name uniqueness if name is being updated
-    if "name" in update_data and update_data["name"] != author.get("name"):
+    old_name = author.get("name")
+    if "name" in update_data and update_data["name"] != old_name:
         existing = collection.find_one({
             "name": {"$regex": f"^{re.escape(update_data['name'])}$", "$options": "i"},
             "is_deleted": {"$ne": True},
@@ -197,6 +198,12 @@ async def update_author(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Author with name '{update_data['name']}' already exists"
             )
+            
+        # P1-15: Propagate name change to related books
+        db.books.update_many(
+            {"author": old_name},
+            {"$set": {"author": update_data["name"]}}
+        )
 
     # Add updated_at timestamp
     update_data["updated_at"] = datetime.utcnow()

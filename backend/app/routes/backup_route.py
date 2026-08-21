@@ -12,6 +12,17 @@ from ..utils.audit import record_audit_log
 
 router = APIRouter(prefix="/api/v1/backups", tags=["Backup & Restore"])
 
+import gridfs
+
+# Initialize GridFS
+fs = None
+
+def get_fs(db):
+    global fs
+    if fs is None:
+        fs = gridfs.GridFS(db, collection="backups_fs")
+    return fs
+
 def _serialize_backup(b: dict) -> dict:
     return {
         "id": str(b["_id"]),
@@ -21,7 +32,8 @@ def _serialize_backup(b: dict) -> dict:
         "total_records": b.get("total_records", 0),
         "created_at": b["created_at"].isoformat() if isinstance(b.get("created_at"), datetime) else str(b.get("created_at", "")),
         "created_by": b.get("created_by", "admin"),
-        "status": b.get("status", "completed")
+        "status": b.get("status", "completed"),
+        "gridfs_id": str(b.get("gridfs_id")) if b.get("gridfs_id") else None
     }
 
 # ─────────────────────────────────────────────
@@ -35,13 +47,19 @@ async def create_manual_backup(
     now = datetime.utcnow()
     filename = f"smart_library_backup_{now.strftime('%Y%m%d_%H%M%S')}.json"
 
-    books = list(db.books.find({}, {"_id": 0}))
-    students = list(db.students.find({}, {"_id": 0}))
-    authors = list(db.authors.find({}, {"_id": 0}))
-    categories = list(db.categories.find({}, {"_id": 0}))
-    borrows = list(db.borrows.find({}, {"_id": 0}))
-    fines = list(db.fines.find({}, {"_id": 0}))
-    reservations = list(db.reservations.find({}, {"_id": 0}))
+    books = list(db.books.find({}))
+    students = list(db.students.find({}))
+    authors = list(db.authors.find({}))
+    categories = list(db.categories.find({}))
+    borrows = list(db.borrows.find({}))
+    fines = list(db.fines.find({}))
+    reservations = list(db.reservations.find({}))
+    
+    # Backup missing collections, strip secrets
+    users = list(db.users.find({}, {"hashed_password": 0, "password": 0, "reset_password_token": 0, "reset_password_expires": 0}))
+    notifications = list(db.notifications.find({}))
+    notification_settings = list(db.notification_settings.find({}))
+    settings = list(db.settings.find({}))
 
     record_counts = {
         "books": len(books),
@@ -50,7 +68,11 @@ async def create_manual_backup(
         "categories": len(categories),
         "borrows": len(borrows),
         "fines": len(fines),
-        "reservations": len(reservations)
+        "reservations": len(reservations),
+        "users": len(users),
+        "notifications": len(notifications),
+        "notification_settings": len(notification_settings),
+        "settings": len(settings)
     }
     total_records = sum(record_counts.values())
 
@@ -65,22 +87,31 @@ async def create_manual_backup(
         "categories": categories,
         "borrows": borrows,
         "fines": fines,
-        "reservations": reservations
+        "reservations": reservations,
+        "users": users,
+        "notifications": notifications,
+        "notification_settings": notification_settings,
+        "settings": settings
     }
 
     json_str = json.dumps(backup_payload, indent=2, default=str)
-    file_size = len(json_str.encode("utf-8"))
+    file_bytes = json_str.encode("utf-8")
+    file_size = len(file_bytes)
 
-    # Store entry in MongoDB backup_history
+    # Use GridFS for storing large backup files
+    grid_fs = get_fs(db)
+    gridfs_id = grid_fs.put(file_bytes, filename=filename)
+
+    # Store entry in MongoDB backup_history without payload
     doc = {
         "filename": filename,
         "file_size": file_size,
         "record_counts": record_counts,
         "total_records": total_records,
-        "payload": json_str,
         "created_at": now,
         "created_by": current_admin.get("username", "admin"),
-        "status": "completed"
+        "status": "completed",
+        "gridfs_id": gridfs_id
     }
     res = db.backup_history.insert_one(doc)
 
@@ -91,14 +122,7 @@ async def create_manual_backup(
 
     return {
         "message": "Manual backup created successfully",
-        "backup": {
-            "id": str(res.inserted_id),
-            "filename": filename,
-            "file_size": file_size,
-            "record_counts": record_counts,
-            "total_records": total_records,
-            "created_at": now.isoformat()
-        }
+        "backup": _serialize_backup({**doc, "_id": res.inserted_id})
     }
 
 # ─────────────────────────────────────────────
@@ -129,8 +153,16 @@ async def download_backup_by_id(
     if not doc:
         raise HTTPException(status_code=404, detail="Backup record not found")
 
-    payload_str = doc.get("payload", "{}")
-    buffer = io.BytesIO(payload_str.encode("utf-8"))
+    grid_fs = get_fs(db)
+    if "gridfs_id" in doc:
+        try:
+            grid_out = grid_fs.get(doc["gridfs_id"])
+            buffer = io.BytesIO(grid_out.read())
+        except gridfs.errors.NoFile:
+            raise HTTPException(status_code=404, detail="Backup file data not found in GridFS")
+    else:
+        payload_str = doc.get("payload", "{}")
+        buffer = io.BytesIO(payload_str.encode("utf-8"))
 
     record_audit_log(
         db, current_admin, "BACKUP_DOWNLOAD", "System Backup",
@@ -158,6 +190,15 @@ async def restore_backup(
     if file:
         if not file.filename.endswith(".json"):
             raise HTTPException(status_code=400, detail="Only JSON backup files are accepted")
+        
+        # P1-23: Add file size limit for restore
+        file.file.seek(0, 2)
+        file_size = file.file.tell()
+        file.file.seek(0)
+        
+        if file_size > 50 * 1024 * 1024:  # 50MB limit
+            raise HTTPException(status_code=400, detail="Backup file is too large (max 50MB)")
+            
         contents = await file.read()
         try:
             data = json.loads(contents.decode("utf-8"))
@@ -169,35 +210,64 @@ async def restore_backup(
         doc = db.backup_history.find_one({"_id": ObjectId(backup_id)})
         if not doc:
             raise HTTPException(status_code=404, detail="Backup record not found")
-        data = json.loads(doc.get("payload", "{}"))
+            
+        grid_fs = get_fs(db)
+        if "gridfs_id" in doc:
+            try:
+                grid_out = grid_fs.get(doc["gridfs_id"])
+                contents = grid_out.read()
+                data = json.loads(contents.decode("utf-8"))
+            except gridfs.errors.NoFile:
+                raise HTTPException(status_code=404, detail="Backup file data not found in GridFS")
+        else:
+            data = json.loads(doc.get("payload", "{}"))
     else:
         raise HTTPException(status_code=400, detail="Please provide either a backup file or a backup_id")
 
     restored_summary = {}
-    collections = ["books", "students", "authors", "categories", "borrows", "fines", "reservations"]
+    collections = ["books", "students", "authors", "categories", "borrows", "fines", "reservations", "users", "notifications", "notification_settings", "settings"]
 
+    # ATOMIC ROLLBACK STRATEGY
+    # Since standalone MongoDB doesn't support multi-document transactions out of the box,
+    # we take a memory snapshot of existing data for rollback.
+    snapshot = {}
     for col in collections:
-        items = data.get(col)
-        if isinstance(items, list) and len(items) > 0:
-            count = 0
-            for item in items:
-                if col == "books" and item.get("isbn"):
-                    db.books.replace_one({"isbn": item["isbn"]}, item, upsert=True)
-                    count += 1
-                elif col == "students" and item.get("student_id"):
-                    db.students.replace_one({"student_id": item["student_id"]}, item, upsert=True)
-                    count += 1
-                elif col == "authors" and item.get("name"):
-                    db.authors.replace_one({"name": item["name"]}, item, upsert=True)
-                    count += 1
-                elif col == "categories" and item.get("name"):
-                    db.categories.replace_one({"name": item["name"]}, item, upsert=True)
-                    count += 1
-                else:
-                    db[col].insert_one(item)
-                    count += 1
-            restored_summary[col] = count
+        snapshot[col] = list(db[col].find({}))
 
+    try:
+        for col in collections:
+            items = data.get(col)
+            if isinstance(items, list) and len(items) > 0:
+                # Clear existing collection before restoring to avoid duplicates / stale data
+                # We do this because a restore is a full overwrite
+                db[col].delete_many({})
+                
+                count = 0
+                for item in items:
+                    if "_id" in item and isinstance(item["_id"], str) and len(item["_id"]) == 24:
+                        item["_id"] = ObjectId(item["_id"])
+                        
+                    if col == "users" and item.get("username"):
+                        # Ensure we don't wipe out passwords for existing users during restore if they were omitted in backup
+                        existing = next((u for u in snapshot["users"] if u.get("username") == item["username"]), None)
+                        if existing and existing.get("hashed_password"):
+                            item["hashed_password"] = existing["hashed_password"]
+                        db.users.replace_one({"username": item["username"]}, item, upsert=True)
+                        count += 1
+                    else:
+                        if "_id" in item:
+                            db[col].replace_one({"_id": item["_id"]}, item, upsert=True)
+                        else:
+                            db[col].insert_one(item)
+                        count += 1
+                restored_summary[col] = count
+    except Exception as e:
+        # ROLLBACK
+        for col in collections:
+            db[col].delete_many({})
+            if snapshot[col]:
+                db[col].insert_many(snapshot[col])
+        raise HTTPException(status_code=500, detail=f"Restore failed, database rolled back to previous state safely. Error: {str(e)}")
     record_audit_log(
         db, current_admin, "BACKUP_RESTORE", "System Disaster Recovery",
         f"Restored database records from backup: {restored_summary}"

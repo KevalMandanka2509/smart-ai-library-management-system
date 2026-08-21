@@ -32,6 +32,8 @@ def serialize_student(student: dict) -> dict:
         student.setdefault("books_borrowed", 0)
         student.setdefault("total_fines", 0.0)
         student.setdefault("is_active", True)
+        student.setdefault("created_at", datetime.utcnow())
+        student.setdefault("updated_at", datetime.utcnow())
         
     return student
 

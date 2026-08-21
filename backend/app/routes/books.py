@@ -12,6 +12,10 @@ from ..core.rbac import has_permission
 router = APIRouter(prefix="/api/v1/books", tags=["Books"])
 
 # ============================================
+# STATIC ROUTES FIRST (before /{book_id} dynamic routes)
+# ============================================
+
+# ============================================
 # 1. CREATE BOOK - Add New Book (Admin Only)
 # ============================================
 @router.post("/", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
@@ -50,166 +54,18 @@ async def get_all_books(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db=Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user=Depends(has_permission("books:read"))
 ):
     """
     Get all books with pagination.
     """
-    print("GET_ALL_BOOKS: START")
     collection = db.books
     
-    print("GET_ALL_BOOKS: EXECUTING FIND")
     books = collection.find().skip(skip).limit(limit)
-    
-    print("GET_ALL_BOOKS: CONVERTING TO LIST")
     books_list = list(books)
-    print(f"GET_ALL_BOOKS: FOUND {len(books_list)} BOOKS")
     
     result = serialize_books(books_list)
-    print("GET_ALL_BOOKS: SERIALIZED, RETURNING")
     return result
-
-# ============================================
-# 3. GET BOOK DETAILS - View Single Book (Registered Users)
-# ============================================
-@router.get("/{book_id}", response_model=BookResponse)
-async def get_book(book_id: str, db=Depends(get_db), current_user=Depends(get_current_user)):
-    """
-    Get detailed information about a specific book.
-    """
-    collection = db.books
-    
-    # Validate ObjectId
-    if not ObjectId.is_valid(book_id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid book ID format"
-        )
-    
-    book = collection.find_one({"_id": ObjectId(book_id)})
-    
-    if not book:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Book with ID {book_id} not found"
-        )
-    
-    return serialize_book(book)
-
-# ============================================
-# 4. UPDATE BOOK - Update Book Details (Admin Only)
-# ============================================
-@router.put("/{book_id}", response_model=BookResponse)
-async def update_book(
-    book_id: str,
-    book_update: BookUpdate,
-    db=Depends(get_db),
-    current_user=Depends(has_permission("books:write"))
-):
-    """
-    Update book details.
-    """
-    collection = db.books
-    
-    # Validate ObjectId
-    if not ObjectId.is_valid(book_id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid book ID format"
-        )
-    
-    # Check if book exists
-    book = collection.find_one({"_id": ObjectId(book_id)})
-    if not book:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Book with ID {book_id} not found"
-        )
-    
-    update_data = book_update.dict(exclude_unset=True)
-    
-    # Update available status
-    if "available_copies" in update_data:
-        update_data["is_available"] = update_data["available_copies"] > 0
-    
-    # Add updated_at timestamp
-    update_data["updated_at"] = datetime.utcnow()
-    
-    from pymongo import ReturnDocument
-    from pymongo.errors import DuplicateKeyError
-    
-    # Update in MongoDB and return updated document
-    try:
-        updated_book = collection.find_one_and_update(
-            {"_id": ObjectId(book_id)},
-            {"$set": update_data},
-            return_document=ReturnDocument.AFTER
-        )
-    except DuplicateKeyError as e:
-        error_msg = str(e)
-        field = "ISBN" if "isbn" in error_msg else "Barcode/QR"
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Book with this {field} already exists"
-        )
-    
-    if not updated_book:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Book with ID {book_id} not found"
-        )
-    
-    return serialize_book(updated_book)
-
-# ============================================
-# 5. DELETE BOOK - Delete Book (Admin Only)
-# ============================================
-@router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_book(book_id: str, db=Depends(get_db), current_user=Depends(has_permission("books:delete"))):
-    """
-    Delete a book from the library.
-    """
-    collection = db.books
-    
-    # Validate ObjectId
-    if not ObjectId.is_valid(book_id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid book ID format"
-        )
-    
-    result = book = collection.find_one({"_id": ObjectId(book_id)})
-    if not book:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Book with ID {book_id} not found"
-        )
-        
-    # Safe delete checks
-    active_borrows = db.borrows.count_documents({"book_id": book_id, "status": "issued"})
-    if active_borrows > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete book. There are {active_borrows} active borrow(s) for this book."
-        )
-        
-    active_reservations = db.reservations.count_documents({"book_id": book_id, "status": {"$in": ["pending", "ready"]}})
-    if active_reservations > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete book. There are {active_reservations} active reservation(s) for this book."
-        )
-    if book:
-        db.recycle_bin.insert_one({"original_collection": "books", "record": book, "deleted_at": datetime.utcnow(), "deleted_by": current_user.get("username", "admin"), "display_name": book.get("title", "Unknown Book")})
-    result = collection.delete_one({"_id": ObjectId(book_id)})
-    
-    if result.deleted_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Book with ID {book_id} not found"
-        )
-    
-    return None
 
 # ============================================
 # 6. SEARCH BOOKS - Advanced Search (Registered Users)
@@ -521,6 +377,14 @@ async def import_books_csv(
 
     # Read and decode file
     contents = await file.read()
+    
+    # P2-27: Upload security - file size limit
+    if len(contents) > 5 * 1024 * 1024:  # 5MB
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size cannot exceed 5MB"
+        )
+    
     try:
         decoded = contents.decode("utf-8-sig")  # handles BOM
     except UnicodeDecodeError:
@@ -535,8 +399,13 @@ async def import_books_csv(
     imported = 0
     skipped = 0
     errors = []
+    MAX_ROWS = 5000  # P2-27: Row count limit
 
     for i, row in enumerate(reader, start=2):  # start=2 (header is row 1)
+        if i - 1 > MAX_ROWS:
+            errors.append(f"Row limit exceeded ({MAX_ROWS}). Remaining rows skipped.")
+            break
+            
         title = row.get("title", "").strip()
         author = row.get("author", "").strip()
         isbn = row.get("isbn", "").strip()
@@ -602,3 +471,173 @@ async def import_books_csv(
         "errors": errors[:20]  # cap error messages
     }
 
+# ============================================
+# DYNAMIC ROUTES (must come AFTER all static routes)
+# ============================================
+
+# ============================================
+# 3. GET BOOK DETAILS - View Single Book (Registered Users)
+# ============================================
+@router.get("/{book_id}", response_model=BookResponse)
+async def get_book(book_id: str, db=Depends(get_db), current_user=Depends(get_current_user)):
+    """
+    Get detailed information about a specific book.
+    """
+    collection = db.books
+    
+    # Validate ObjectId
+    if not ObjectId.is_valid(book_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid book ID format"
+        )
+    
+    book = collection.find_one({"_id": ObjectId(book_id)})
+    
+    if not book:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Book with ID {book_id} not found"
+        )
+    
+    return serialize_book(book)
+
+# ============================================
+# 4. UPDATE BOOK - Update Book Details (Admin Only)
+# ============================================
+@router.put("/{book_id}", response_model=BookResponse)
+async def update_book(
+    book_id: str,
+    book_update: BookUpdate,
+    db=Depends(get_db),
+    current_user=Depends(has_permission("books:write"))
+):
+    """
+    Update book details.
+    """
+    collection = db.books
+    
+    # Validate ObjectId
+    if not ObjectId.is_valid(book_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid book ID format"
+        )
+    
+    # Check if book exists
+    book = collection.find_one({"_id": ObjectId(book_id)})
+    if not book:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Book with ID {book_id} not found"
+        )
+    
+    update_data = book_update.dict(exclude_unset=True)
+    
+    # P1-6: Inventory integrity — enforce 0 <= available_copies <= total_copies
+    effective_total = update_data.get("total_copies", book.get("total_copies", 1))
+    effective_available = update_data.get("available_copies", book.get("available_copies", 0))
+    
+    if effective_available > effective_total:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Available copies ({effective_available}) cannot exceed total copies ({effective_total})"
+        )
+    
+    if effective_available < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Available copies cannot be negative"
+        )
+    
+    # If total_copies is being reduced, ensure it doesn't go below issued count
+    if "total_copies" in update_data:
+        issued_count = db.borrows.count_documents({"book_id": book_id, "status": "issued"})
+        if update_data["total_copies"] < issued_count:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot reduce total copies below currently issued count ({issued_count})"
+            )
+    
+    # Update available status
+    if "available_copies" in update_data:
+        update_data["is_available"] = update_data["available_copies"] > 0
+    
+    # Add updated_at timestamp
+    update_data["updated_at"] = datetime.utcnow()
+    
+    from pymongo import ReturnDocument
+    from pymongo.errors import DuplicateKeyError
+    
+    # Update in MongoDB and return updated document
+    try:
+        updated_book = collection.find_one_and_update(
+            {"_id": ObjectId(book_id)},
+            {"$set": update_data},
+            return_document=ReturnDocument.AFTER
+        )
+    except DuplicateKeyError as e:
+        error_msg = str(e)
+        field = "ISBN" if "isbn" in error_msg else "Barcode/QR"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Book with this {field} already exists"
+        )
+    
+    if not updated_book:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Book with ID {book_id} not found"
+        )
+    
+    return serialize_book(updated_book)
+
+# ============================================
+# 5. DELETE BOOK - Delete Book (Admin Only)
+# ============================================
+@router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_book(book_id: str, db=Depends(get_db), current_user=Depends(has_permission("books:delete"))):
+    """
+    Delete a book from the library.
+    """
+    collection = db.books
+    
+    # Validate ObjectId
+    if not ObjectId.is_valid(book_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid book ID format"
+        )
+    
+    result = book = collection.find_one({"_id": ObjectId(book_id)})
+    if not book:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Book with ID {book_id} not found"
+        )
+        
+    # Safe delete checks
+    active_borrows = db.borrows.count_documents({"book_id": book_id, "status": "issued"})
+    if active_borrows > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete book. There are {active_borrows} active borrow(s) for this book."
+        )
+        
+    active_reservations = db.reservations.count_documents({"book_id": book_id, "status": {"$in": ["pending", "ready"]}})
+    if active_reservations > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete book. There are {active_reservations} active reservation(s) for this book."
+        )
+    if book:
+        db.recycle_bin.insert_one({"original_collection": "books", "record": book, "deleted_at": datetime.utcnow(), "deleted_by": current_user.get("username", "admin"), "display_name": book.get("title", "Unknown Book")})
+    result = collection.delete_one({"_id": ObjectId(book_id)})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Book with ID {book_id} not found"
+        )
+    
+    return None

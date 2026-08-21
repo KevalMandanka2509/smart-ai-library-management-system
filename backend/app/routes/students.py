@@ -12,6 +12,10 @@ from ..core.rbac import has_permission
 router = APIRouter(prefix="/api/v1/students", tags=["Students"])
 
 # ============================================
+# STATIC ROUTES FIRST (before /{student_id} dynamic routes)
+# ============================================
+
+# ============================================
 # 1. CREATE STUDENT - Add New Student (Admin Only)
 # ============================================
 @router.post("/", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
@@ -62,206 +66,6 @@ async def get_all_students(
     response.headers["X-Total-Count"] = str(total)
     students = db.students.find().skip(skip).limit(limit)
     return serialize_students(list(students))
-
-# ============================================
-# 3. GET STUDENT DETAILS - View Single Student (Registered Users)
-# ============================================
-@router.get("/{student_id}", response_model=StudentResponse)
-async def get_student(
-    student_id: str, 
-    db=Depends(get_db), 
-    current_user=Depends(get_current_user)
-):
-    """
-    Get detailed information about a specific student.
-    """
-    collection = db.students
-    
-    # Check if student_id is ObjectId or custom student_id
-    student = None
-    if ObjectId.is_valid(student_id):
-        student = collection.find_one({"_id": ObjectId(student_id)})
-    else:
-        student = collection.find_one({"student_id": student_id})
-    
-    # Auto-create if not found and is their own username/email
-    if not student and (student_id == current_user.get("username") or student_id == current_user.get("email")):
-        student_profile = {
-            "student_id": current_user["username"],
-            "full_name": current_user.get("full_name") or current_user["username"],
-            "email": current_user["email"],
-        }
-        collection.insert_one(student_document(student_profile))
-        student = collection.find_one({"student_id": current_user["username"]})
-    
-    if not student:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Student with ID {student_id} not found"
-        )
-        
-    # Enforce authorization: Non-admins can only view their own student details
-    if current_user.get("role") not in ["admin", "librarian"]:
-        if student.get("student_id") != current_user.get("username") and student.get("email", "").lower() != current_user.get("email", "").lower():
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied. You can only view your own profile."
-            )
-    
-    return serialize_student(student)
-
-# ============================================
-# 4. UPDATE STUDENT - Update Student Details
-# ============================================
-@router.put("/{student_id}", response_model=StudentResponse)
-async def update_student(
-    student_id: str,
-    student_update: StudentUpdate,
-    db=Depends(get_db),
-    current_user=Depends(get_current_user)
-):
-    """
-    Update student details.
-    - Partial updates allowed
-    - Validates student_id and email uniqueness if changed
-    """
-    collection = db.students
-    
-    # Find student
-    if ObjectId.is_valid(student_id):
-        student = collection.find_one({"_id": ObjectId(student_id)})
-    else:
-        student = collection.find_one({"student_id": student_id})
-    
-    if not student:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Student with ID {student_id} not found"
-        )
-        
-    # Enforce authorization: Non-admins can only update their own student details
-    if current_user.get("role") not in ["admin", "librarian"]:
-        if student.get("student_id") != current_user.get("username") and student.get("email", "").lower() != current_user.get("email", "").lower():
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied. You can only update your own profile."
-            )
-    
-    update_data = student_update.dict(exclude_unset=True)
-    
-    # If not admin, restrict fields they can update
-    if current_user.get("role") not in ["admin", "librarian"]:
-        update_data.pop("is_active", None)
-    
-    # Check student_id modification authorization
-    if "student_id" in update_data and update_data["student_id"] != student.get("student_id"):
-        if current_user.get("role") not in ["admin", "librarian"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only administrators can modify student IDs"
-            )
-    
-    # Add updated_at timestamp
-    update_data["updated_at"] = datetime.utcnow()
-    
-    from pymongo import ReturnDocument
-    from pymongo.errors import DuplicateKeyError
-    
-    # Update in MongoDB
-    try:
-        if ObjectId.is_valid(student_id):
-            updated_student = collection.find_one_and_update(
-                {"_id": ObjectId(student_id)},
-                {"$set": update_data},
-                return_document=ReturnDocument.AFTER
-            )
-        else:
-            updated_student = collection.find_one_and_update(
-                {"student_id": student_id},
-                {"$set": update_data},
-                return_document=ReturnDocument.AFTER
-            )
-    except DuplicateKeyError as e:
-        error_msg = str(e)
-        field = "email" if "email" in error_msg else "student_id"
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Student with this {field} already exists"
-        )
-    
-    return serialize_student(updated_student)
-
-# ============================================
-# 5. DELETE STUDENT - Delete Student (Admin Only)
-# ============================================
-@router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_student(
-    student_id: str, 
-    db=Depends(get_db), 
-    current_user=Depends(has_permission("students:manage"))
-):
-    """
-    Delete a student from the library system.
-    """
-    collection = db.students
-    
-    # Find and delete
-    if ObjectId.is_valid(student_id):
-        record_to_delete = collection.find_one({"_id": ObjectId(student_id)})
-    else:
-        record_to_delete = collection.find_one({"student_id": student_id})
-        
-    if not record_to_delete:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Student with ID {student_id} not found"
-        )
-        
-    actual_student_id = record_to_delete.get("student_id")
-    
-    # Safe delete checks
-    active_borrows = db.borrows.count_documents({"student_id": actual_student_id, "status": "issued"})
-    if active_borrows > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete student. They have {active_borrows} active borrow(s)."
-        )
-        
-    unpaid_fines = db.fines.count_documents({"student_id": actual_student_id, "paid": False})
-    if unpaid_fines > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete student. They have {unpaid_fines} unpaid fine(s)."
-        )
-        
-    active_reservations = db.reservations.count_documents({"student_id": actual_student_id, "status": {"$in": ["pending", "ready"]}})
-    if active_reservations > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete student. They have {active_reservations} active reservation(s)."
-        )
-
-    if record_to_delete:
-        db.recycle_bin.insert_one({
-            "original_collection": "students", 
-            "record": record_to_delete, 
-            "deleted_at": datetime.utcnow(), 
-            "deleted_by": current_user.get("username", "admin") if current_user else "admin", 
-            "display_name": record_to_delete.get("name", record_to_delete.get("full_name", record_to_delete.get("title", "Deleted Record")))
-        })
-        
-    if ObjectId.is_valid(student_id):
-        result = collection.delete_one({"_id": ObjectId(student_id)})
-    else:
-        result = collection.delete_one({"student_id": student_id})
-    
-    if result.deleted_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Student with ID {student_id} not found"
-        )
-    
-    return None
 
 # ============================================
 # 6. SEARCH STUDENTS - Advanced Search (Admin Only)
@@ -479,6 +283,14 @@ async def import_students_csv(
         )
 
     contents = await file.read()
+    
+    # P2-27: Upload security - file size limit
+    if len(contents) > 5 * 1024 * 1024:  # 5MB
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size cannot exceed 5MB"
+        )
+    
     try:
         decoded = contents.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -493,8 +305,13 @@ async def import_students_csv(
     imported = 0
     skipped = 0
     errors = []
+    MAX_ROWS = 5000  # P2-27: Row count limit
 
     for i, row in enumerate(reader, start=2):
+        if i - 1 > MAX_ROWS:
+            errors.append(f"Row limit exceeded ({MAX_ROWS}). Remaining rows skipped.")
+            break
+            
         student_id = row.get("student_id", "").strip()
         full_name = row.get("full_name", "").strip()
         email = row.get("email", "").strip()
@@ -546,3 +363,234 @@ async def import_students_csv(
         "skipped": skipped,
         "errors": errors[:20]
     }
+
+# ============================================
+# DYNAMIC ROUTES (must come AFTER all static routes)
+# ============================================
+
+# ============================================
+# 3. GET STUDENT DETAILS - View Single Student (Registered Users)
+# ============================================
+@router.get("/{student_id}", response_model=StudentResponse)
+async def get_student(
+    student_id: str, 
+    db=Depends(get_db), 
+    current_user=Depends(get_current_user)
+):
+    """
+    Get detailed information about a specific student.
+    """
+    collection = db.students
+    
+    # Check if student_id is ObjectId or custom student_id
+    student = None
+    if ObjectId.is_valid(student_id):
+        student = collection.find_one({"_id": ObjectId(student_id)})
+    else:
+        student = collection.find_one({"student_id": student_id})
+        
+    # RBAC Check
+    role = current_user.get("role", "member")
+    if role not in ["admin", "librarian"]:
+        username = current_user.get("username")
+        # Ensure they can only view their own profile
+        if student and student.get("student_id") != username and str(student.get("_id")) != student_id:
+             if student_id != username:
+                 raise HTTPException(
+                     status_code=status.HTTP_403_FORBIDDEN,
+                     detail="Not authorized to view other student profiles"
+                 )
+    
+    # Auto-create if not found and is their own username/email
+    if not student and (student_id == current_user.get("username") or student_id == current_user.get("email")):
+        student_profile = {
+            "student_id": current_user["username"],
+            "full_name": current_user.get("full_name") or current_user["username"],
+            "email": current_user["email"],
+        }
+        collection.insert_one(student_document(student_profile))
+        student = collection.find_one({"student_id": current_user["username"]})
+    
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Student with ID {student_id} not found"
+        )
+        
+    # Enforce authorization: Non-admins can only view their own student details
+    if current_user.get("role") not in ["admin", "librarian"]:
+        if student.get("student_id") != current_user.get("username") and student.get("email", "").lower() != current_user.get("email", "").lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. You can only view your own profile."
+            )
+    
+    return serialize_student(student)
+
+# ============================================
+# 4. UPDATE STUDENT - Update Student Details
+# ============================================
+@router.put("/{student_id}", response_model=StudentResponse)
+async def update_student(
+    student_id: str,
+    student_update: StudentUpdate,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """
+    Update student details.
+    - Partial updates allowed
+    - Validates student_id and email uniqueness if changed
+    """
+    collection = db.students
+    
+    # Find student
+    if ObjectId.is_valid(student_id):
+        student = collection.find_one({"_id": ObjectId(student_id)})
+    else:
+        student = collection.find_one({"student_id": student_id})
+    
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Student with ID {student_id} not found"
+        )
+        
+    # Enforce authorization: Non-admins can only update their own student details
+    if current_user.get("role") not in ["admin", "librarian"]:
+        if student.get("student_id") != current_user.get("username") and student.get("email", "").lower() != current_user.get("email", "").lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. You can only update your own profile."
+            )
+    
+    update_data = student_update.dict(exclude_unset=True)
+    
+    # If not admin, restrict fields they can update
+    if current_user.get("role") not in ["admin", "librarian"]:
+        update_data.pop("is_active", None)
+    
+    # P1-14: Student ID change - propagate to related records
+    old_student_id = student.get("student_id")
+    if "student_id" in update_data and update_data["student_id"] != old_student_id:
+        if current_user.get("role") not in ["admin", "librarian"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can modify student IDs"
+            )
+        new_student_id = update_data["student_id"]
+        # Propagate student_id change to all related collections
+        db.borrows.update_many({"student_id": old_student_id}, {"$set": {"student_id": new_student_id}})
+        db.fines.update_many({"student_id": old_student_id}, {"$set": {"student_id": new_student_id}})
+        db.reservations.update_many({"student_id": old_student_id}, {"$set": {"student_id": new_student_id}})
+        db.notifications.update_many({"student_id": old_student_id}, {"$set": {"student_id": new_student_id}})
+        db.users.update_one({"username": old_student_id}, {"$set": {"username": new_student_id}})
+    
+    # Add updated_at timestamp
+    update_data["updated_at"] = datetime.utcnow()
+    
+    from pymongo import ReturnDocument
+    from pymongo.errors import DuplicateKeyError
+    
+    # Update in MongoDB
+    try:
+        if ObjectId.is_valid(student_id):
+            updated_student = collection.find_one_and_update(
+                {"_id": ObjectId(student_id)},
+                {"$set": update_data},
+                return_document=ReturnDocument.AFTER
+            )
+        else:
+            updated_student = collection.find_one_and_update(
+                {"student_id": student_id},
+                {"$set": update_data},
+                return_document=ReturnDocument.AFTER
+            )
+    except DuplicateKeyError as e:
+        error_msg = str(e)
+        field = "email" if "email" in error_msg else "student_id"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Student with this {field} already exists"
+        )
+    
+    return serialize_student(updated_student)
+
+# ============================================
+# 5. DELETE STUDENT - Delete Student (Admin Only)
+# ============================================
+@router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_student(
+    student_id: str, 
+    db=Depends(get_db), 
+    current_user=Depends(has_permission("students:manage"))
+):
+    """
+    Delete a student from the library system.
+    """
+    collection = db.students
+    
+    # Find and delete
+    if ObjectId.is_valid(student_id):
+        record_to_delete = collection.find_one({"_id": ObjectId(student_id)})
+    else:
+        record_to_delete = collection.find_one({"student_id": student_id})
+        
+    if not record_to_delete:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Student with ID {student_id} not found"
+        )
+        
+    actual_student_id = record_to_delete.get("student_id")
+    
+    # Safe delete checks
+    active_borrows = db.borrows.count_documents({"student_id": actual_student_id, "status": "issued"})
+    if active_borrows > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete student. They have {active_borrows} active borrow(s)."
+        )
+        
+    unpaid_fines = db.fines.count_documents({"student_id": actual_student_id, "paid": False})
+    if unpaid_fines > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete student. They have {unpaid_fines} unpaid fine(s)."
+        )
+        
+    active_reservations = db.reservations.count_documents({"student_id": actual_student_id, "status": {"$in": ["pending", "ready"]}})
+    if active_reservations > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete student. They have {active_reservations} active reservation(s)."
+        )
+
+    if record_to_delete:
+        db.recycle_bin.insert_one({
+            "original_collection": "students", 
+            "record": record_to_delete, 
+            "deleted_at": datetime.utcnow(), 
+            "deleted_by": current_user.get("username", "admin") if current_user else "admin", 
+            "display_name": record_to_delete.get("name", record_to_delete.get("full_name", record_to_delete.get("title", "Deleted Record")))
+        })
+    
+    # P1-14: Deactivate linked user account (don't delete, to preserve audit trail)
+    if actual_student_id:
+        db.users.update_one(
+            {"username": actual_student_id},
+            {"$set": {"is_active": False}}
+        )
+        
+    if ObjectId.is_valid(student_id):
+        result = collection.delete_one({"_id": ObjectId(student_id)})
+    else:
+        result = collection.delete_one({"student_id": student_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Student with ID {student_id} not found"
+        )
+    
+    return None

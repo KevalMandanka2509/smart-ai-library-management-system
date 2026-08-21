@@ -5,20 +5,22 @@ from typing import List
 
 from ..database import get_db
 from ..schemas.reservation import ReservationRequest, ReservationResponse
-from ..core.security import get_current_user
+from ..core.security import get_current_user, get_current_admin
 from ..core.rbac import has_permission
+from ..utils.settings_helper import get_library_settings
 
 router = APIRouter(prefix="/api/v1/reservations", tags=["Reservations"])
 
 def serialize_reservation(res) -> dict:
     return {
-        "id": str(res["_id"]),
-        "student_id": res["student_id"],
+        "id": str(res.get("_id", "")),
+        "student_id": res.get("student_id", ""),
         "student_name": res.get("student_name", "Unknown Student"),
-        "book_id": res["book_id"],
+        "book_id": res.get("book_id", ""),
         "book_title": res.get("book_title", "Unknown Book"),
-        "reserved_at": res["reserved_at"],
-        "status": res["status"]
+        "reserved_at": res.get("reserved_at"),
+        "status": res.get("status", "pending"),
+        "ready_at": res.get("ready_at")
     }
 
 # ============================================
@@ -27,7 +29,7 @@ def serialize_reservation(res) -> dict:
 @router.post("/reserve", response_model=dict)
 async def reserve_book(request: ReservationRequest, db=Depends(get_db), current_user=Depends(get_current_user)):
     # 1. Check permissions / resolve student_id
-    is_admin = current_user.get("role") == "admin"
+    is_admin = current_user.get("role") in ["admin", "librarian"]
     student_id = request.student_id if (is_admin and request.student_id) else current_user.get("username")
     
     # 2. Get student details and verify active
@@ -130,7 +132,10 @@ async def reserve_book(request: ReservationRequest, db=Depends(get_db), current_
 # ============================================
 @router.get("/active", response_model=List[dict])
 async def get_active_reservations(db=Depends(get_db), current_user=Depends(get_current_user)):
-    is_admin = current_user.get("role") == "admin"
+    # Clean up expired first (P1-10)
+    await expire_stale_reservations_internal(db)
+
+    is_admin = current_user.get("role") in ["admin", "librarian"]
     query = {"status": {"$in": ["pending", "ready"]}}
     
     if not is_admin:
@@ -138,6 +143,68 @@ async def get_active_reservations(db=Depends(get_db), current_user=Depends(get_c
         
     res_list = db.reservations.find(query).sort("reserved_at", -1)
     return [serialize_reservation(r) for r in res_list]
+
+async def expire_stale_reservations_internal(db):
+    """Internal helper to expire stale reservations."""
+    from datetime import timedelta
+    lib_settings = get_library_settings(db)
+    max_days = lib_settings["max_reservation_days"]
+    now = datetime.utcnow()
+    cutoff_time = now - timedelta(days=max_days)
+    
+    stale_res = list(db.reservations.find({
+        "status": "ready",
+        "ready_at": {"$lt": cutoff_time}
+    }))
+    
+    from ..utils.notification_helper import create_notification
+    import asyncio
+    
+    for res in stale_res:
+        # Mark expired
+        db.reservations.update_one({"_id": res["_id"]}, {"$set": {"status": "expired"}})
+        
+        # Notify student
+        asyncio.create_task(create_notification(
+            db,
+            student_id=res["student_id"],
+            title="Reservation Expired",
+            message=f"Your reservation for '{res.get('book_title')}' has expired because it was not picked up within {max_days} days.",
+            n_type="reservation_update"
+        ))
+        
+        # Pass copy to next pending reserver or return to circulation
+        book_id = res["book_id"]
+        next_res = db.reservations.find_one_and_update(
+            {"book_id": book_id, "status": "pending"},
+            {"$set": {"status": "ready", "ready_at": now}},
+            sort=[("reserved_at", 1)]
+        )
+        
+        if next_res:
+            asyncio.create_task(create_notification(
+                db,
+                student_id=next_res["student_id"],
+                title="Reserved Book Ready",
+                message=f"The book '{next_res.get('book_title')}' you reserved is now ready for pickup.",
+                n_type="reservation_update"
+            ))
+        else:
+            db.books.update_one(
+                {"_id": ObjectId(book_id)},
+                {
+                    "$inc": {"available_copies": 1},
+                    "$set": {"is_available": True}
+                }
+            )
+
+# ============================================
+# 2b. EXPIRE STALE RESERVATIONS (Admin)
+# ============================================
+@router.post("/expire-stale", response_model=dict)
+async def trigger_expire_stale(db=Depends(get_db), current_user=Depends(has_permission("reservations:manage"))):
+    await expire_stale_reservations_internal(db)
+    return {"message": "Stale reservations processed successfully."}
 
 # ============================================
 # 3. CANCEL RESERVATION
@@ -151,7 +218,7 @@ async def cancel_reservation(id: str, db=Depends(get_db), current_user=Depends(g
     if not res:
         raise HTTPException(status_code=404, detail="Reservation not found")
         
-    is_admin = current_user.get("role") == "admin"
+    is_admin = current_user.get("role") in ["admin", "librarian"]
     if not is_admin and res["student_id"] != current_user.get("username"):
         raise HTTPException(status_code=403, detail="Not authorized to cancel this reservation")
 
@@ -169,7 +236,7 @@ async def cancel_reservation(id: str, db=Depends(get_db), current_user=Depends(g
         # Check for next pending reservation atomically
         next_res = db.reservations.find_one_and_update(
             {"book_id": book_id, "status": "pending"},
-            {"$set": {"status": "ready"}},
+            {"$set": {"status": "ready", "ready_at": datetime.utcnow()}},
             sort=[("reserved_at", 1)]
         )
         

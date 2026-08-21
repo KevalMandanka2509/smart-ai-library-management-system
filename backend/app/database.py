@@ -1,3 +1,11 @@
+"""
+Database connection and initialization module.
+
+NOTE (P2-25): This application uses synchronous `pymongo` with FastAPI `async def` routes.
+While this works for low-to-medium traffic, it can block the asyncio event loop under high load.
+For high-concurrency production deployments, consider migrating to `motor` (async pymongo) 
+or changing route definitions from `async def` to `def` so FastAPI runs them in a threadpool.
+"""
 from pymongo import MongoClient, ASCENDING, DESCENDING, TEXT
 from .config import settings
 import logging
@@ -134,6 +142,14 @@ class Database:
         self._ensure_index(borrows, [("issue_date", DESCENDING)])
         self._ensure_index(borrows, [("return_date", DESCENDING)], sparse=True)
         self._ensure_index(borrows, [("student_id", ASCENDING), ("issue_date", DESCENDING)])
+        # P1-7: Unique partial index to prevent duplicate active borrows (same student + book)
+        self._ensure_index(
+            borrows,
+            [("student_id", ASCENDING), ("book_id", ASCENDING)],
+            unique=True,
+            partialFilterExpression={"status": "issued"},
+            name="unique_active_borrow"
+        )
 
         # ── Fines ──
         fines = db.fines
@@ -150,6 +166,14 @@ class Database:
         self._ensure_index(reservations, "student_id")
         self._ensure_index(reservations, [("book_id", ASCENDING), ("student_id", ASCENDING), ("status", ASCENDING)])
         self._ensure_index(reservations, [("status", ASCENDING), ("reserved_at", ASCENDING)])
+        # P1-8: Unique partial index to prevent duplicate active reservations (same student + book)
+        self._ensure_index(
+            reservations,
+            [("student_id", ASCENDING), ("book_id", ASCENDING)],
+            unique=True,
+            partialFilterExpression={"status": {"$in": ["pending", "ready"]}},
+            name="unique_active_reservation"
+        )
 
         # ── Authors ──
         self._ensure_index(db.authors, "name")

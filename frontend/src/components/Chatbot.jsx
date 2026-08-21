@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { sendChatMessage, streamChatMessage, getChatSessions } from '../services/api';
+import { sendChatMessage, streamChatMessage, getChatSessions, getAiStatus } from '../services/api';
 import './Chatbot.css';
 
 // Helper to check if text contains a markdown table
@@ -78,6 +78,7 @@ const Chatbot = () => {
   const [userName, setUserName] = useState('Admin');
   const [showHistory, setShowHistory] = useState(false);
   const [savedSessions, setSavedSessions] = useState([]);
+  const [aiStatus, setAiStatus] = useState('online');
 
   useEffect(() => {
     if (isOpen && showHistory) {
@@ -99,6 +100,14 @@ const Chatbot = () => {
         setUserName(p.full_name || 'Member');
       } catch (_) { }
     }
+    
+    getAiStatus().then(data => {
+      if (data && data.status) {
+        setAiStatus(data.status);
+      }
+    }).catch(err => {
+      setAiStatus('offline');
+    });
   }, []);
 
   const fileInputRef = useRef(null);
@@ -213,10 +222,10 @@ const Chatbot = () => {
     const currentFile = selectedFile;
     
     if (typeof overrideMessage !== 'string') {
-      setMessage('');
       const inputEl = document.getElementById('eu-chatbot-input');
       if (inputEl) inputEl.style.height = 'inherit';
     }
+    setMessage('');
     
     setSelectedFile(null);
     setIsLoading(true);
@@ -342,7 +351,13 @@ const Chatbot = () => {
         ) : (
         <>
           <div className="eu-chatbot-status-bar">
-            <span className="status-dot"></span> Online <span style={{ opacity: 0.5 }}>• Ready to help</span>
+            {aiStatus === 'online' ? (
+              <><span className="status-dot"></span> Online <span style={{ opacity: 0.5 }}>• Ready to help</span></>
+            ) : aiStatus === 'db_mode' ? (
+              <><span className="status-dot" style={{ backgroundColor: '#ff9800' }}></span> Library Assistant <span style={{ opacity: 0.5 }}>• DB mode</span></>
+            ) : (
+              <><span className="status-dot" style={{ backgroundColor: '#f44336' }}></span> Offline <span style={{ opacity: 0.5 }}>• Backend unreachable</span></>
+            )}
           </div>
 
         {/* MESSAGES */}

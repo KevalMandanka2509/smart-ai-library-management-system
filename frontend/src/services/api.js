@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -161,7 +161,7 @@ export const getStudentStats = async () => {
 };
 
 export const bulkDeleteStudents = async (studentIds) => {
-  const response = await api.post('/students/bulk-delete', { ids: studentIds });
+  const response = await api.post('/students/bulk-delete', { student_ids: studentIds });
   return response.data;
 };
 
@@ -240,7 +240,7 @@ export const getGenres = async () => {
 };
 
 export const bulkDeleteBooks = async (bookIds) => {
-  const response = await api.post('/books/bulk-delete', { ids: bookIds });
+  const response = await api.post('/books/bulk-delete', { book_ids: bookIds });
   return response.data;
 };
 
@@ -465,12 +465,12 @@ export const getAuditLogs = async (page = 1, pageSize = 20) => {
 
 // ===== System Settings API =====
 export const getSystemSettings = async () => {
-  const response = await api.get('/settings');
+  const response = await api.get('/settings/');
   return response.data;
 };
 
 export const updateSystemSettings = async (payload) => {
-  const response = await api.put('/settings', payload);
+  const response = await api.put('/settings/', payload);
   return response.data;
 };
 
@@ -508,7 +508,7 @@ export const restoreDatabaseBackup = async (file) => {
 
 // ===== Audit Logs API =====
 export const getAuditLogsAdvanced = async (params) => {
-  const response = await api.get('/audit-logs', { params });
+  const response = await api.get('/audit-logs/', { params });
   return response.data;
 };
 
@@ -642,12 +642,12 @@ export const verifyOtp = async (phone, code) => {
 
 // ===== Barcodes & QR API =====
 export const getBarcodeImageUrl = (codeValue) => {
-  const baseURL = api.defaults.baseURL || 'http://localhost:8000/api/v1';
+  const baseURL = api.defaults.baseURL || '/api/v1';
   return `${baseURL}/barcodes/render/barcode/${encodeURIComponent(codeValue)}`;
 };
 
 export const getQrImageUrl = (codeValue) => {
-  const baseURL = api.defaults.baseURL || 'http://localhost:8000/api/v1';
+  const baseURL = api.defaults.baseURL || '/api/v1';
   return `${baseURL}/barcodes/render/qr/${encodeURIComponent(codeValue)}`;
 };
 
@@ -762,7 +762,7 @@ export const streamChatMessage = async (message, history = [], sessionId = null,
   if (file) formData.append('file', file);
 
   const token = localStorage.getItem('access_token');
-  const baseURL = api.defaults.baseURL || 'http://127.0.0.1:8000/api/v1';
+  const baseURL = api.defaults.baseURL || '/api/v1';
 
   try {
     const response = await fetch(`${baseURL}/ai/chat`, {
@@ -795,6 +795,11 @@ export const streamChatMessage = async (message, history = [], sessionId = null,
   } catch (error) {
     if (onError) onError(error);
   }
+};
+
+export const getAiStatus = async () => {
+  const response = await api.get('/ai/status');
+  return response.data;
 };
 
 export const getChatSessions = async () => {

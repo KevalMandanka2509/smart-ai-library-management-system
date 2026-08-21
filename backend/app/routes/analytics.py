@@ -166,11 +166,11 @@ async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_p
         recent_transactions.append({
             "student_name": borrow.get("student_name", "Unknown"),
             "book_title": borrow.get("book_title", "Unknown"),
-            "issue_date": borrow["issue_date"].isoformat() if borrow.get("issue_date") else None,
-            "due_date": borrow["due_date"].isoformat() if borrow.get("due_date") else None,
-            "return_date": borrow["return_date"].isoformat() if borrow.get("return_date") else None,
+            "issue_date": borrow["issue_date"].isoformat() if hasattr(borrow.get("issue_date"), "isoformat") else borrow.get("issue_date"),
+            "due_date": borrow["due_date"].isoformat() if hasattr(borrow.get("due_date"), "isoformat") else borrow.get("due_date"),
+            "return_date": borrow["return_date"].isoformat() if hasattr(borrow.get("return_date"), "isoformat") else borrow.get("return_date"),
             "status": borrow.get("status", "unknown"),
-            "overdue": borrow.get("status") == "issued" and borrow.get("due_date") and borrow["due_date"] < now
+            "overdue": borrow.get("status") == "issued" and borrow.get("due_date") and (borrow["due_date"] < now if not isinstance(borrow["due_date"], str) else False)
         })
 
     
@@ -361,7 +361,7 @@ async def get_reports(
             "book_title": f.get("book_title", "Unknown"),
             "amount": f.get("amount", 0),
             "reason": f.get("reason", "Late Return"),
-            "created_at": f["created_at"].isoformat() if f.get("created_at") else None,
+            "created_at": f["created_at"].isoformat() if hasattr(f.get("created_at"), "isoformat") else f.get("created_at"),
             "paid": f.get("paid", False)
         })
 
@@ -376,9 +376,9 @@ async def get_reports(
             "student_id": b.get("student_id"),
             "student_name": b.get("student_name", "Unknown"),
             "book_title": b.get("book_title", "Unknown"),
-            "issue_date": b["issue_date"].isoformat() if b.get("issue_date") else None,
-            "due_date": b["due_date"].isoformat() if b.get("due_date") else None,
-            "return_date": b["return_date"].isoformat() if b.get("return_date") else None,
+            "issue_date": b["issue_date"].isoformat() if hasattr(b.get("issue_date"), "isoformat") else b.get("issue_date"),
+            "due_date": b["due_date"].isoformat() if hasattr(b.get("due_date"), "isoformat") else b.get("due_date"),
+            "return_date": b["return_date"].isoformat() if hasattr(b.get("return_date"), "isoformat") else b.get("return_date"),
             "status": b.get("status", "unknown")
         })
 
@@ -409,6 +409,11 @@ async def schedule_report(
     db=Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    """
+    Schedule a report (Daily/Weekly/Monthly).
+    The APScheduler running inside the FastAPI lifespan will query the 
+    `scheduled_reports` collection and trigger the actual email delivery.
+    """
     role = current_user.get("role", "member")
     if role not in ["admin", "librarian"]:
         raise HTTPException(status_code=403, detail="Not authorized to schedule reports")

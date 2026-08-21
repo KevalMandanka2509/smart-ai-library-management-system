@@ -1,12 +1,34 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+import time
+from collections import defaultdict
 
 from ..database import get_db
 from ..core.security import get_current_admin
 from ..services.sms_service import SmsService
 import asyncio
+
+# P0-4: In-memory rate limiter for OTP endpoints
+_otp_rate_limit = defaultdict(list)  # {client_ip: [timestamps]}
+_OTP_RATE_WINDOW = 600  # 10 minutes
+_OTP_RATE_LIMIT = 5     # max 5 OTP requests per window per IP
+
+def _check_otp_rate_limit(client_ip: str):
+    """Check and enforce OTP rate limit. Raises HTTPException if exceeded."""
+    now = time.time()
+    cutoff = now - _OTP_RATE_WINDOW
+    timestamps = _otp_rate_limit[client_ip]
+    # Clean old entries
+    while timestamps and timestamps[0] < cutoff:
+        timestamps.pop(0)
+    if len(timestamps) >= _OTP_RATE_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many OTP requests. Please try again later."
+        )
+    timestamps.append(now)
 
 router = APIRouter(prefix="/api/v1/sms", tags=["SMS Service"])
 
@@ -277,9 +299,22 @@ async def get_sms_templates(current_admin=Depends(get_current_admin)):
 # 9. GENERATE & SEND OTP
 # ─────────────────────────────────────────────
 @router.post("/send-otp", response_model=dict)
-async def generate_otp(payload: OtpRequest, db=Depends(get_db)):
+async def generate_otp(payload: OtpRequest, request: Request, db=Depends(get_db)):
     """Generate and dispatch SMS OTP code."""
-    otp_code = await SmsService.send_otp_sms(payload.phone, db=db)
+    # P0-4: Rate limiting
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    _check_otp_rate_limit(client_ip)
+    
+    # P0-4: Validate phone belongs to an existing user or student
+    phone = payload.phone.strip()
+    user_exists = db.users.find_one({"phone": phone}) or db.students.find_one({"phone": phone})
+    if not user_exists:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone number is not associated with any account"
+        )
+    
+    otp_code = await SmsService.send_otp_sms(phone, db=db)
     if not otp_code:
         raise HTTPException(status_code=500, detail="Failed to dispatch OTP verification SMS")
     return {"success": True, "message": "OTP verification SMS sent successfully"}
@@ -288,8 +323,12 @@ async def generate_otp(payload: OtpRequest, db=Depends(get_db)):
 # 10. VERIFY OTP CODE
 # ─────────────────────────────────────────────
 @router.post("/verify-otp", response_model=dict)
-async def verify_otp(payload: OtpVerifyRequest, db=Depends(get_db)):
+async def verify_otp(payload: OtpVerifyRequest, request: Request, db=Depends(get_db)):
     """Verify code matches for phone."""
+    # P0-4: Rate limiting on verify too
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    _check_otp_rate_limit(client_ip)
+    
     is_valid = SmsService.verify_otp(payload.phone, payload.code, db=db)
     if not is_valid:
         raise HTTPException(status_code=400, detail="Invalid or expired OTP verification code")

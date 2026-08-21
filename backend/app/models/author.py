@@ -17,9 +17,12 @@ def author_document(data: dict) -> dict:
 
 def serialize_author(author: dict) -> dict:
     """Convert MongoDB document to dict with string id"""
-    if author and "_id" in author:
-        author["id"] = str(author["_id"])
-        del author["_id"]
+    if author:
+        if "_id" in author:
+            author["id"] = str(author["_id"])
+            del author["_id"]
+        author.setdefault("created_at", datetime.utcnow())
+        author.setdefault("updated_at", datetime.utcnow())
     return author
 
 

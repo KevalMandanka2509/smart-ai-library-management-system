@@ -11,7 +11,7 @@ def login():
     client = MongoClient('mongodb://localhost:27017/')
     db = client['library_db']
     from bson.objectid import ObjectId
-    user = db.users.find_one({"_id": ObjectId("6a5dffa47dc57ec34ff1a484")})
+    user = db.users.find_one()
     if not user:
         print("User not found")
         return None

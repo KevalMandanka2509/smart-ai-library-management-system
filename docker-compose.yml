@@ -5,12 +5,23 @@ services:
     image: mongo:6.0
     container_name: library_database
     restart: always
-    ports:
-      - "27017:27017"
+    # P0-3: Do NOT expose MongoDB port publicly — only backend should access it
+    # ports:
+    #   - "27017:27017"
     volumes:
       - mongo_data:/data/db
     environment:
       - MONGO_INITDB_DATABASE=library_db
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-libraryAdmin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:?MONGO_ROOT_PASSWORD must be set}
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - library_net
 
   backend:
     build:
@@ -21,14 +32,24 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - MONGODB_URL=mongodb://database:27017
+      - MONGODB_URL=mongodb://${MONGO_ROOT_USER:-libraryAdmin}:${MONGO_ROOT_PASSWORD:?MONGO_ROOT_PASSWORD must be set}@database:27017
       - DATABASE_NAME=library_db
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set}
       - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:?DEFAULT_ADMIN_PASSWORD must be set}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - DEBUG=False
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost,http://localhost:80,http://localhost:5173}
     depends_on:
-      - database
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - library_net
 
   frontend:
     build:
@@ -40,6 +61,12 @@ services:
       - "80:80"
     depends_on:
       - backend
+    networks:
+      - library_net
 
 volumes:
   mongo_data:
+
+networks:
+  library_net:
+    driver: bridge

@@ -7,6 +7,7 @@ import json
 
 from ..database import get_db
 from ..core.security import get_current_admin, get_current_user
+from ..core.rbac import has_permission
 
 router = APIRouter(prefix="/api/v1/settings", tags=["System Settings"])
 
@@ -95,7 +96,7 @@ async def get_system_settings(
 async def update_system_settings(
     payload: SystemSettingsSchema,
     db=Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user=Depends(has_permission("settings:manage"))
 ):
     role = current_user.get("role", "member")
     if role not in ["admin", "librarian"]:
@@ -196,7 +197,8 @@ async def export_database_backup(
         "categories": list(db.categories.find({}, {"_id": 0})),
         "borrows": list(db.borrows.find({}, {"_id": 0})),
         "fines": list(db.fines.find({}, {"_id": 0})),
-        "reservations": list(db.reservations.find({}, {"_id": 0}))
+        "reservations": list(db.reservations.find({}, {"_id": 0})),
+        "users": list(db.users.find({}, {"_id": 0, "hashed_password": 0, "password": 0, "reset_password_token": 0, "reset_password_expires": 0}))
     }
 
     json_str = json.dumps(backup_data, indent=2, default=str)
@@ -219,6 +221,14 @@ async def restore_database_backup(
     if not file.filename.endswith(".json"):
         raise HTTPException(status_code=400, detail="Only JSON backup files are accepted")
 
+    # P1-23: Add file size limit for restore
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    
+    if file_size > 50 * 1024 * 1024:  # 50MB limit
+        raise HTTPException(status_code=400, detail="Backup file is too large (max 50MB)")
+        
     contents = await file.read()
     try:
         data = json.loads(contents.decode("utf-8"))
@@ -226,7 +236,7 @@ async def restore_database_backup(
         raise HTTPException(status_code=400, detail="Invalid JSON backup file format")
 
     restored_summary = {}
-    collections = ["books", "students", "authors", "categories", "borrows", "fines", "reservations"]
+    collections = ["books", "students", "authors", "categories", "borrows", "fines", "reservations", "users"]
     
     for col in collections:
         items = data.get(col)
@@ -245,6 +255,12 @@ async def restore_database_backup(
                     count += 1
                 elif col == "categories" and item.get("name"):
                     db.categories.replace_one({"name": item["name"]}, item, upsert=True)
+                    count += 1
+                elif col == "users" and item.get("username"):
+                    existing = db.users.find_one({"username": item["username"]})
+                    if existing:
+                        item["hashed_password"] = existing.get("hashed_password")
+                    db.users.replace_one({"username": item["username"]}, item, upsert=True)
                     count += 1
                 else:
                     db[col].insert_one(item)

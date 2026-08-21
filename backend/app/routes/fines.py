@@ -6,21 +6,21 @@ from typing import List
 from ..database import get_db
 from ..schemas.fine import FinePayRequest
 from ..core.security import get_current_user, get_current_admin
-from ..utils.fine_config import get_fine_rate
+from ..utils.settings_helper import get_library_settings
 
 router = APIRouter(prefix="/api/v1/fines", tags=["Fines"])
 
 def serialize_fine(fine) -> dict:
     return {
-        "id": str(fine["_id"]),
-        "borrow_id": fine["borrow_id"],
-        "student_id": fine["student_id"],
+        "id": str(fine.get("_id", "")),
+        "borrow_id": fine.get("borrow_id", ""),
+        "student_id": fine.get("student_id", ""),
         "student_name": fine.get("student_name", "Unknown Student"),
         "book_title": fine.get("book_title", "Unknown Book"),
-        "amount": fine["amount"],
+        "amount": fine.get("amount", 0.0),
         "reason": fine.get("reason", "Late Return"),
-        "created_at": fine["created_at"],
-        "paid": fine["paid"],
+        "created_at": fine.get("created_at"),
+        "paid": fine.get("paid", False),
         "paid_at": fine.get("paid_at")
     }
 
@@ -41,7 +41,7 @@ async def get_fines(
     db=Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    is_admin = current_user.get("role") == "admin"
+    is_admin = current_user.get("role") in ["admin", "librarian"]
     query = {"paid": paid}
     
     if not is_admin:
@@ -67,25 +67,38 @@ async def get_fines(
 
     # 2. Add Dynamic Accumulating Fines (only on page 1 for unpaid)
     if not paid and page == 1:
+        lib_settings = get_library_settings(db)
+        grace_days = lib_settings["grace_period_days"]
+        fine_rate = lib_settings["daily_fine_rate"]
+        max_fine = lib_settings["max_fine_per_book"]
+        currency = lib_settings["currency_symbol"]
+
         overdue_borrows = db.borrows.find(borrow_query)
         for b in overdue_borrows:
             due = b.get("due_date")
             if not due: continue
-            overdue_days = (now - due).days
-            if overdue_days == 0 and (now - due).total_seconds() > 0:
-                overdue_days = 1
+            raw_overdue_days = (now - due).days
+            if raw_overdue_days == 0 and (now - due).total_seconds() > 0:
+                raw_overdue_days = 1
+            
+            overdue_days = max(0, raw_overdue_days - grace_days)
             if overdue_days > 0:
+                fine_amount = overdue_days * fine_rate
+                if fine_amount > max_fine:
+                    fine_amount = max_fine
+                    
                 serialized_fines.insert(0, {
                     "id": "dyn_" + str(b["_id"]),
                     "borrow_id": str(b["_id"]),
                     "student_id": b.get("student_id", ""),
                     "student_name": b.get("student_name", "Unknown Student"),
                     "book_title": b.get("book_title", "Unknown Book"),
-                    "amount": overdue_days * get_fine_rate(db),
-                    "reason": f"Accumulating ({overdue_days} days late)",
+                    "amount": fine_amount,
+                    "reason": f"Accumulating ({overdue_days} days late, {grace_days}-day grace applied)",
                     "created_at": now,
                     "paid": False,
-                    "paid_at": None
+                    "paid_at": None,
+                    "currency_symbol": currency
                 })
 
     return {
@@ -108,8 +121,11 @@ async def pay_fine(request: FinePayRequest, db=Depends(get_db), current_user=Dep
     if not fine:
         raise HTTPException(status_code=404, detail="Fine record not found")
         
+    if fine.get("paid"):
+        raise HTTPException(status_code=400, detail="This fine has already been paid")
+        
     # Check permissions
-    is_admin = current_user.get("role") == "admin"
+    is_admin = current_user.get("role") in ["admin", "librarian"]
     if not is_admin and fine["student_id"] != current_user.get("username"):
         raise HTTPException(status_code=403, detail="Not authorized to pay this fine")
 

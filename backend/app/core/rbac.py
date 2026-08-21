@@ -19,6 +19,7 @@ SYSTEM_PERMISSIONS = [
     "notifications:manage",
     "profile:read",
     "profile:write",
+    "settings:manage",
     "admin:manage"
 ]
 
