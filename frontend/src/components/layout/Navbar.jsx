@@ -89,6 +89,32 @@ const IconBell = () => (
 const Navbar = ({ isLoggedIn, userRole, onLogout, sidebarCollapsed, onToggleSidebar }) => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('home');
+
+  useEffect(() => {
+    if (isLoggedIn) return;
+
+    const handleScroll = () => {
+      const sections = ['home', 'features', 'about', 'contact'];
+      const scrollPos = window.scrollY + 120;
+
+      for (const section of sections) {
+        const el = document.getElementById(section);
+        if (el) {
+          const top = el.offsetTop;
+          const height = el.offsetHeight;
+          if (scrollPos >= top && scrollPos < top + height) {
+            setActiveSection(section);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isLoggedIn]);
+
   const handleLogout = () => {
     localStorage.clear();
     if (onLogout) onLogout();
@@ -162,7 +188,6 @@ const Navbar = ({ isLoggedIn, userRole, onLogout, sidebarCollapsed, onToggleSide
     ];
   }
 
-
   if (isLoggedIn) {
     return (
       <aside className="sidebar">
@@ -207,32 +232,6 @@ const Navbar = ({ isLoggedIn, userRole, onLogout, sidebarCollapsed, onToggleSide
       </aside>
     );
   }
-
-  const [activeSection, setActiveSection] = useState('home');
-
-  useEffect(() => {
-    if (isLoggedIn) return;
-
-    const handleScroll = () => {
-      const sections = ['home', 'features', 'about', 'contact'];
-      const scrollPos = window.scrollY + 120;
-
-      for (const section of sections) {
-        const el = document.getElementById(section);
-        if (el) {
-          const top = el.offsetTop;
-          const height = el.offsetHeight;
-          if (scrollPos >= top && scrollPos < top + height) {
-            setActiveSection(section);
-            break;
-          }
-        }
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isLoggedIn]);
 
   const handleNavClick = (link, e) => {
     setIsMenuOpen(false);

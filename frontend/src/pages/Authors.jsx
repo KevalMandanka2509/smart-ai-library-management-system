@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { PageHeader } from '../components/layout/EnterpriseLibrary';
 import { getAuthors, createAuthor, updateAuthor, deleteAuthor } from '../services/api';
-import { User, MapPin, Calendar, FileText, Settings, X, AlertTriangle } from 'lucide-react';
+import { User, MapPin, Calendar, FileText, X, AlertTriangle } from 'lucide-react';
 import './Authors.css';
 
 const Authors = () => {
@@ -44,6 +44,7 @@ const Authors = () => {
       const paginated = data.slice(startIndex, startIndex + pageSize);
       setAuthors(paginated);
     } catch (err) {
+      console.error(err);
       setError('Failed to load authors list.');
     } finally {
       setLoading(false);

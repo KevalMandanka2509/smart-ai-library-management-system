@@ -506,24 +506,43 @@ async def bulk_return_books(
             detail="transaction_ids must be a non-empty list"
         )
 
-    processed_count = 0
+    tx_obj_ids = [ObjectId(tx_id) for tx_id in tx_ids if ObjectId.is_valid(tx_id)]
+    if not tx_obj_ids:
+        return {"message": "Successfully processed returns for 0 transaction(s)"}
+
+    # Fetch all active borrows in one go
+    borrows = list(db.borrows.find({"_id": {"$in": tx_obj_ids}, "status": "issued"}))
+    if not borrows:
+        return {"message": "Successfully processed returns for 0 transaction(s)"}
+
     now = datetime.utcnow()
+    valid_tx_ids = [b["_id"] for b in borrows]
+    
+    # Mark them returned in bulk
+    db.borrows.update_many(
+        {"_id": {"$in": valid_tx_ids}},
+        {"$set": {"status": "returned", "return_date": now}}
+    )
+
+    # Fetch all books in one go
+    book_ids = list(set([ObjectId(b["book_id"]) for b in borrows if ObjectId.is_valid(b["book_id"])]))
+    books = list(db.books.find({"_id": {"$in": book_ids}}))
+    books_map = {str(b["_id"]): b for b in books}
+
+    from ..utils.fine_config import get_fine_rate
+    fine_rate = get_fine_rate(db)
+
     from ..utils.notification_helper import create_notification
     import asyncio
     
-    for tx_id in tx_ids:
-        if not ObjectId.is_valid(tx_id): continue
-        borrow = db.borrows.find_one_and_update(
-            {"_id": ObjectId(tx_id), "status": "issued"},
-            {"$set": {"status": "returned", "return_date": now}}
-        )
-        if not borrow: continue
-        
-        book_id = borrow["book_id"]
-        book = db.books.find_one({"_id": ObjectId(book_id)})
+    fines_to_insert = []
+    
+    for borrow in borrows:
+        book_id_str = borrow["book_id"]
+        book = books_map.get(book_id_str)
         if not book: continue
 
-        # 2. Calculate late fine
+        # Calculate late fine
         fine_amount = 0.0
         due_date = borrow["due_date"]
         if now > due_date:
@@ -531,13 +550,11 @@ async def bulk_return_books(
             if overdue_days == 0 and (now - due_date).total_seconds() > 0:
                 overdue_days = 1
             if overdue_days > 0:
-                from ..utils.fine_config import get_fine_rate
-                fine_rate = get_fine_rate(db)
                 fine_amount = overdue_days * fine_rate
 
-        # 4. Save fine record if applicable
+        # Save fine record if applicable
         if fine_amount > 0:
-            db.fines.insert_one({
+            fines_to_insert.append({
                 "borrow_id": str(borrow["_id"]),
                 "student_id": borrow["student_id"],
                 "student_name": borrow.get("student_name", "Unknown Student"),
@@ -549,9 +566,9 @@ async def bulk_return_books(
                 "paid_at": None
             })
 
-        # 5. Check reservation queue atomically
+        # Check reservation queue atomically
         oldest_res = db.reservations.find_one_and_update(
-            {"book_id": str(book["_id"]), "status": "pending"},
+            {"book_id": book_id_str, "status": "pending"},
             {"$set": {"status": "ready", "ready_at": now}},
             sort=[("reserved_at", 1)]
         )
@@ -559,11 +576,13 @@ async def bulk_return_books(
         if oldest_res:
             asyncio.create_task(create_notification(db, student_id=oldest_res["student_id"], title="Reserved Book Ready for Pickup", message=f"The book '{book['title']}' you reserved is now ready for pickup.", n_type="reservation_update"))
         else:
-            db.books.update_one({"_id": book["_id"]}, {"$inc": {"available_copies": 1}, "$set": {"is_available": True}})
+            db.books.update_one({"_id": ObjectId(book_id_str)}, {"$inc": {"available_copies": 1}, "$set": {"is_available": True}})
 
-        processed_count += 1
+    if fines_to_insert:
+        db.fines.insert_many(fines_to_insert)
 
-    return {"message": f"Successfully processed returns for {processed_count} transaction(s)"}
+    return {"message": f"Successfully processed returns for {len(borrows)} transaction(s)"}
+
 
 # ============================================
 # 4. LIST BY STUDENT (Registered Users)

@@ -51,7 +51,6 @@ const Books = () => {
   const [editingBook, setEditingBook] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLibrarian, setIsLibrarian] = useState(false);
-  const [isStudent, setIsStudent] = useState(false);
 
   // Advanced Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,7 +63,6 @@ const Books = () => {
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(12);
-  const [totalBooks, setTotalBooks] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
   // Bulk Action States
@@ -81,7 +79,6 @@ const Books = () => {
         const user = JSON.parse(stored);
             setIsAdmin(user.role === 'admin');
             setIsLibrarian(user.role === 'librarian');
-            setIsStudent(user.role === 'member');
       } catch (e) {
         console.error(e);
       }
@@ -128,7 +125,6 @@ const Books = () => {
       };
       const response = await browseBooks(params);
       setBooks(response.books || []);
-      setTotalBooks(response.total || 0);
       setTotalPages(response.total_pages || 1);
     } catch (err) {
       setError('Failed to load books from server.');

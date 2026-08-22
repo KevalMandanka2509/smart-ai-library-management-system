@@ -8,6 +8,7 @@ from .reservations import router as reservations_router
 from .fines import router as fines_router
 from .notifications import router as notifications_router
 from .analytics import router as analytics_router
+from .enterprise_analytics import router as enterprise_analytics_router
 from .search import router as search_router
 from .profile_admin import router as profile_admin_router
 from .settings_route import router as settings_router
@@ -33,6 +34,7 @@ __all__ = [
     "fines_router",
     "notifications_router",
     "analytics_router",
+    "enterprise_analytics_router",
     "search_router",
     "profile_admin_router",
     "settings_router",

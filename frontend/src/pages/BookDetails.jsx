@@ -315,7 +315,7 @@ const BookDetailPage = () => {
         <div style={{ padding: '2.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
           {/* Left column: book details */}
           <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--ink)', marginBottom: '1.5rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.8rem' }}>
+            <h3 style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--ink)', marginBottom: '1.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Book Information
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>

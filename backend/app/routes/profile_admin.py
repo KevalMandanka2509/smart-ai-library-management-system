@@ -222,10 +222,9 @@ async def upload_avatar(
     db=Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Only image files are accepted")
-    
-    contents = await file.read()
+    from ..utils.file_validation import validate_file_magic_bytes
+    contents = await validate_file_magic_bytes(file, ["image/jpeg", "image/png", "image/gif"])
+
     if len(contents) > 2 * 1024 * 1024: # 2MB limit
         raise HTTPException(status_code=400, detail="Avatar image size cannot exceed 2MB")
 

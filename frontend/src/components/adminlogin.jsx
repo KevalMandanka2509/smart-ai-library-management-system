@@ -16,7 +16,6 @@ const AdminLogin = ({ onLoginSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('🔵 Admin login form submitted');
 
     setError('');
     setSuccess('');
@@ -30,7 +29,6 @@ const AdminLogin = ({ onLoginSuccess }) => {
 
     try {
       const data = await login(email, password);
-      console.log('✅ Admin login response:', data);
 
       if (!data.user || data.user.role !== 'admin') {
         throw new Error('Access denied. Administrator privileges required.');
@@ -52,7 +50,6 @@ const AdminLogin = ({ onLoginSuccess }) => {
       }, 1500);
 
     } catch (err) {
-      console.error('❌ Admin login failed:', err);
       const errMsg = err.message === 'Access denied. Administrator privileges required.'
         ? err.message
         : (err?.response?.data?.detail || 'Invalid email or password. Please try again.');

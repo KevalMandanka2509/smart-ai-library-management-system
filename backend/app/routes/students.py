@@ -282,7 +282,8 @@ async def import_students_csv(
             detail="Only CSV files are accepted"
         )
 
-    contents = await file.read()
+    from ..utils.file_validation import validate_file_magic_bytes
+    contents = await validate_file_magic_bytes(file, ["text/csv"])
     
     # P2-27: Upload security - file size limit
     if len(contents) > 5 * 1024 * 1024:  # 5MB

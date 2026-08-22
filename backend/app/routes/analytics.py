@@ -44,8 +44,10 @@ async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_p
     available_books = db.books.count_documents({"is_available": True})
     issued_books = total_books - available_books
 
-    # Genre breakdown — aggregation pipeline instead of Python loop
+    # Genre breakdown — aggregation pipeline (only for books added in last 365 days to avoid full scan)
+    start_365 = now - timedelta(days=365)
     genre_pipeline = [
+        {"$match": {"created_at": {"$gte": start_365}}},
         {"$group": {"_id": {"$ifNull": ["$genre", "Uncategorized"]}, "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
         {"$limit": 20}
@@ -55,21 +57,11 @@ async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_p
         for doc in db.books.aggregate(genre_pipeline)
     ]
 
-    # ── Borrows — combine count queries into single aggregation ──
-    borrow_stats_pipeline = [
-        {"$facet": {
-            "active": [{"$match": {"status": "issued"}}, {"$count": "n"}],
-            "returned": [{"$match": {"status": "returned"}}, {"$count": "n"}],
-            "overdue": [{"$match": {"status": "issued", "due_date": {"$lt": now}}}, {"$count": "n"}],
-            "new_7d": [{"$match": {"issue_date": {"$gte": start_7}}}, {"$count": "n"}],
-        }}
-    ]
-    borrow_facets = list(db.borrows.aggregate(borrow_stats_pipeline))
-    bs = borrow_facets[0] if borrow_facets else {}
-    total_issued = bs.get("active", [{}])[0].get("n", 0) if bs.get("active") else 0
-    total_returned = bs.get("returned", [{}])[0].get("n", 0) if bs.get("returned") else 0
-    overdue_count = bs.get("overdue", [{}])[0].get("n", 0) if bs.get("overdue") else 0
-    new_issues_7d = bs.get("new_7d", [{}])[0].get("n", 0) if bs.get("new_7d") else 0
+    # ── Borrows — optimized ──
+    total_issued = db.borrows.count_documents({"status": "issued"})
+    total_returned = db.borrows.count_documents({"status": "returned"})
+    overdue_count = db.borrows.count_documents({"status": "issued", "due_date": {"$lt": now}})
+    new_issues_7d = db.borrows.count_documents({"issue_date": {"$gte": start_7}})
 
     # ── Students ──
     total_students = db.students.estimated_document_count()
@@ -84,8 +76,9 @@ async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_p
     ab_result = list(db.borrows.aggregate(active_borrowers_pipeline))
     active_borrowers_30d = ab_result[0]["n"] if ab_result else 0
 
-    # ── Fines — single aggregation for paid/unpaid totals ──
+    # ── Fines — single aggregation for paid/unpaid totals (last 90 days) ──
     fine_pipeline = [
+        {"$match": {"created_at": {"$gte": start_30}}},
         {"$group": {
             "_id": "$paid",
             "total": {"$sum": "$amount"},
@@ -99,8 +92,10 @@ async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_p
     unpaid_fines_count = unpaid.get("count", 0)
     total_collected_fines = round(paid.get("total", 0), 2)
 
-    # ── Popular books — aggregation pipeline (top 10 most borrowed) ──
+    # ── Popular books (last 90 days) — aggregation pipeline (top 10 most borrowed) ──
+    start_90 = now - timedelta(days=90)
     popular_pipeline = [
+        {"$match": {"issue_date": {"$gte": start_90}}},
         {"$group": {
             "_id": "$book_id",
             "title": {"$first": "$book_title"},
@@ -112,8 +107,9 @@ async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_p
     ]
     popular_books = list(db.borrows.aggregate(popular_pipeline))
 
-    # ── Top students — aggregation pipeline (top 10 borrowers) ──
+    # ── Top students (last 90 days) — aggregation pipeline (top 10 borrowers) ──
     top_students_pipeline = [
+        {"$match": {"issue_date": {"$gte": start_90}}},
         {"$group": {
             "_id": "$student_id",
             "name": {"$first": "$student_name"},
@@ -124,8 +120,6 @@ async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_p
         {"$project": {"_id": 0, "student_id": "$_id", "name": 1, "borrow_count": 1}}
     ]
     top_students = list(db.borrows.aggregate(top_students_pipeline))
-
-    start_90 = now - timedelta(days=90)
 
     # ── Borrow trend (last 90 days) — aggregation pipelines ──
     trend_issue_pipeline = [
@@ -174,8 +168,8 @@ async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_p
         })
 
     
-    # --- Activity Heatmap (last 365 days daily) ---
-    heatmap_start = now - timedelta(days=365)
+    # --- Activity Heatmap (last 90 days daily) ---
+    heatmap_start = start_90
     heatmap_agg_issues = list(db.borrows.aggregate([
         {"$match": {"issue_date": {"$gte": heatmap_start}}},
         {"$group": {
@@ -307,46 +301,23 @@ async def get_reports(
         for k in all_keys
     ]
 
-    # ── Summary stats — combine into $facet ──
-    summary_pipeline = [
-        {"$facet": {
-            "total_issues": [
-                {"$match": {"issue_date": {"$gte": start}}},
-                {"$count": "n"}
-            ],
-            "total_returns": [
-                {"$match": {"return_date": {"$gte": start, "$ne": None}}},
-                {"$count": "n"}
-            ],
-            "overdue": [
-                {"$match": {"status": "issued", "due_date": {"$lt": now, "$gte": start}}},
-                {"$count": "n"}
-            ]
-        }}
-    ]
-    summary_result = list(db.borrows.aggregate(summary_pipeline))
-    sr = summary_result[0] if summary_result else {}
-    total_issues_in_range = sr.get("total_issues", [{}])[0].get("n", 0) if sr.get("total_issues") else 0
-    total_returns_in_range = sr.get("total_returns", [{}])[0].get("n", 0) if sr.get("total_returns") else 0
-    overdue_in_range = sr.get("overdue", [{}])[0].get("n", 0) if sr.get("overdue") else 0
+    # ── Summary stats — individual optimized queries ──
+    total_issues_in_range = db.borrows.count_documents({"issue_date": {"$gte": start}})
+    total_returns_in_range = db.borrows.count_documents({"return_date": {"$gte": start, "$ne": None}})
+    overdue_in_range = db.borrows.count_documents({"status": "issued", "due_date": {"$lt": now, "$gte": start}})
 
-    # Fine totals via aggregation
-    fine_summary_pipeline = [
-        {"$facet": {
-            "generated": [
-                {"$match": {"created_at": {"$gte": start}}},
-                {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
-            ],
-            "collected": [
-                {"$match": {"paid": True, "paid_at": {"$gte": start}}},
-                {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
-            ]
-        }}
-    ]
-    fine_summary = list(db.fines.aggregate(fine_summary_pipeline))
-    fs = fine_summary[0] if fine_summary else {}
-    total_fines_in_range = round(fs.get("generated", [{}])[0].get("total", 0), 2) if fs.get("generated") else 0
-    fines_collected_in_range = round(fs.get("collected", [{}])[0].get("total", 0), 2) if fs.get("collected") else 0
+    # Fine totals via individual aggregations
+    gen_agg = list(db.fines.aggregate([
+        {"$match": {"created_at": {"$gte": start}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+    ]))
+    total_fines_in_range = round(gen_agg[0]["total"], 2) if gen_agg else 0
+
+    col_agg = list(db.fines.aggregate([
+        {"$match": {"paid": True, "paid_at": {"$gte": start}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+    ]))
+    fines_collected_in_range = round(col_agg[0]["total"], 2) if col_agg else 0
 
     # ── Fine detail list — with projection ──
     FINE_PROJ = {

@@ -13,6 +13,7 @@ from .routes import (
     fines_router,
     notifications_router,
     analytics_router,
+    enterprise_analytics_router,
     search_router,
     profile_admin_router,
     recommendations_router,
@@ -149,6 +150,7 @@ app.include_router(reservations_router)
 app.include_router(fines_router)
 app.include_router(notifications_router)
 app.include_router(analytics_router)
+app.include_router(enterprise_analytics_router)
 app.include_router(search_router)
 app.include_router(profile_admin_router)
 app.include_router(recommendations_router)

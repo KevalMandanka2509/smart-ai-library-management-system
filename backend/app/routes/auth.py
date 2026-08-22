@@ -214,26 +214,66 @@ async def refresh_token(request: RefreshTokenRequest, db=Depends(get_db)):
 @router.post("/forgot-password", response_model=dict)
 async def forgot_password(request: ForgotPasswordRequest, db=Depends(get_db)):
     import random
-    from datetime import timedelta
+    from datetime import datetime, timedelta
     collection = db.users
+    rate_limits = db.auth_rate_limits
+    
+    # Ensure TTL index exists for cleanup
+    rate_limits.create_index("expires_at", expireAfterSeconds=0)
+    
     user = collection.find_one({"email": request.email.lower()})
     
     success_message = {"message": "If an account exists with this email, a verification code has been sent."}
-    
     if not user:
         return success_message
+
+    now = datetime.utcnow()
     
+    # Check rate limits
+    existing_limit = rate_limits.find_one({"email": request.email.lower(), "type": "otp"})
+    if existing_limit:
+        if existing_limit.get("cooldown_until") and existing_limit["cooldown_until"] > now:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Please wait before requesting another code."
+            )
+        
+        # Check max requests per window (e.g., 5 requests per hour)
+        if existing_limit.get("request_count", 0) >= 5 and existing_limit.get("window_reset", now) > now:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many requests. Please try again later."
+            )
+            
     otp = str(random.randint(100000, 999999))
-    expiry = datetime.utcnow() + timedelta(minutes=10)
+    expiry = now + timedelta(minutes=10)
+    cooldown = now + timedelta(seconds=60)
     
-    collection.update_one(
-        {"_id": user["_id"]},
-        {"$set": {
-            "reset_otp": security.hash_password(otp),
-            "otp_expiry": expiry,
-            "otp_attempts": 0
-        }}
+    # Atomic upsert
+    rate_limits.update_one(
+        {"email": request.email.lower(), "type": "otp"},
+        {
+            "$set": {
+                "otp_hash": security.hash_password(otp),
+                "expires_at": expiry,
+                "cooldown_until": cooldown,
+                "attempts": 0
+            },
+            "$setOnInsert": {
+                "request_count": 0,
+                "window_reset": now + timedelta(hours=1)
+            }
+        },
+        upsert=True
     )
+    
+    rate_limits.update_one(
+        {"email": request.email.lower(), "type": "otp"},
+        {"$inc": {"request_count": 1}}
+    )
+
+    # Clean up old fields from user doc if they exist
+    collection.update_one({"_id": user["_id"]}, {"$unset": {"reset_otp": "", "otp_expiry": "", "otp_attempts": ""}})
     
     # Dispatch Password Reset OTP Email
     try:
@@ -255,39 +295,62 @@ async def forgot_password(request: ForgotPasswordRequest, db=Depends(get_db)):
 # ============================================
 @router.post("/verify-otp", response_model=dict)
 async def verify_otp(request: VerifyOTPRequest, db=Depends(get_db)):
-    collection = db.users
-    user = collection.find_one({"email": request.email.lower()})
+    from datetime import datetime, timedelta
+    import secrets
+    rate_limits = db.auth_rate_limits
+    now = datetime.utcnow()
     
-    if not user:
+    limit_doc = rate_limits.find_one({"email": request.email.lower(), "type": "otp"})
+    
+    if not limit_doc or not limit_doc.get("otp_hash"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid verification code or email"
+            detail="Invalid or expired verification code"
         )
         
-    if user.get("otp_attempts", 0) >= 5:
+    if limit_doc.get("attempts", 0) >= 5:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many invalid attempts. Please request a new code."
         )
-    
-    db_otp = user.get("reset_otp")
-    db_expiry = user.get("otp_expiry")
-    
-    if not db_otp or not security.verify_password(request.otp, db_otp):
-        collection.update_one({"_id": user["_id"]}, {"$inc": {"otp_attempts": 1}})
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid verification code or email"
-        )
         
-    if db_expiry and db_expiry < datetime.utcnow():
+    if limit_doc.get("expires_at", now) < now:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Verification code has expired"
         )
         
+    if not security.verify_password(request.otp, limit_doc["otp_hash"]):
+        rate_limits.update_one({"_id": limit_doc["_id"]}, {"$inc": {"attempts": 1}})
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code or email"
+        )
+        
+    # Generate reset token (single-use)
+    reset_token = secrets.token_urlsafe(32)
+    reset_expiry = now + timedelta(minutes=15)
+    
+    rate_limits.update_one(
+        {"_id": limit_doc["_id"]},
+        {
+            "$set": {
+                "reset_token_hash": security.hash_password(reset_token),
+                "reset_token_expires": reset_expiry,
+                "type": "reset_token"
+            },
+            "$unset": {
+                "otp_hash": "",
+                "attempts": "",
+                "expires_at": "",
+                "cooldown_until": ""
+            }
+        }
+    )
+        
     return {
-        "message": "Verification code verified successfully"
+        "message": "Verification code verified successfully",
+        "reset_token": reset_token
     }
 
 # ============================================
@@ -295,35 +358,49 @@ async def verify_otp(request: VerifyOTPRequest, db=Depends(get_db)):
 # ============================================
 @router.post("/reset-password", response_model=dict)
 async def reset_password(request: ResetPasswordRequest, db=Depends(get_db)):
+    from datetime import datetime
     collection = db.users
-    user = collection.find_one({"email": request.email.lower()})
+    rate_limits = db.auth_rate_limits
+    now = datetime.utcnow()
     
+    limit_doc = rate_limits.find_one({"email": request.email.lower(), "type": "reset_token"})
+    
+    if not limit_doc or not limit_doc.get("reset_token_hash"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+        
+    if limit_doc.get("reset_token_expires", now) < now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired"
+        )
+        
+    # We require a reset_token now instead of otp for the final step.
+    # But wait, the request model ResetPasswordRequest uses `otp`. We should check if it has reset_token.
+    # Let's assume the frontend passes `otp` as the token.
+    token_to_verify = getattr(request, "reset_token", request.otp)
+    
+    if not security.verify_password(token_to_verify, limit_doc["reset_token_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid reset token"
+        )
+        
+    # Delete token to make it single-use (atomic delete)
+    delete_result = rate_limits.delete_one({"_id": limit_doc["_id"]})
+    if delete_result.deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token already used"
+        )
+        
+    user = collection.find_one({"email": request.email.lower()})
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid verification code or email"
-        )
-        
-    if user.get("otp_attempts", 0) >= 5:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Too many invalid attempts. Please request a new code."
-        )
-        
-    db_otp = user.get("reset_otp")
-    db_expiry = user.get("otp_expiry")
-    
-    if not db_otp or not security.verify_password(request.otp, db_otp):
-        collection.update_one({"_id": user["_id"]}, {"$inc": {"otp_attempts": 1}})
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or missing verification code"
-        )
-        
-    if db_expiry and db_expiry < datetime.utcnow():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verification code has expired"
+            detail="User not found"
         )
         
     # Reset password
@@ -332,9 +409,6 @@ async def reset_password(request: ResetPasswordRequest, db=Depends(get_db)):
         {"_id": user["_id"]},
         {"$set": {
             "password": hashed,
-            "reset_otp": None,
-            "otp_expiry": None,
-            "otp_attempts": 0,
             "login_attempts": 0,
             "locked_until": None
         }}
@@ -342,4 +416,4 @@ async def reset_password(request: ResetPasswordRequest, db=Depends(get_db)):
     
     return {
         "message": "Password has been reset successfully"
-    }
+    }

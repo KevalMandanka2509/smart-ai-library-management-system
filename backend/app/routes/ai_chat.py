@@ -191,6 +191,11 @@ async def chat_with_ai(
         # P1-18: Message length limit
         if len(message) > 1000:
             raise HTTPException(status_code=400, detail="Message too long. Please keep it under 1000 characters.")
+            
+        if file:
+            from ..utils.file_validation import validate_file_magic_bytes
+            # Allow common document types for AI analysis
+            await validate_file_magic_bytes(file, ["text/plain", "application/pdf", "text/csv"])
         
         # Lightweight greeting handling
         clean_msg = message.lower().strip()

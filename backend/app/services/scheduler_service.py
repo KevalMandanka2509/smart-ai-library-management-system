@@ -5,6 +5,8 @@ from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime, timedelta
 import asyncio
 from typing import Any
+import uuid
+import socket
 
 from ..database import Database
 from .email_service import EmailService
@@ -12,6 +14,60 @@ from .email_service import EmailService
 logger = logging.getLogger("app.scheduler")
 
 scheduler = AsyncIOScheduler()
+WORKER_ID = f"{socket.gethostname()}-{uuid.uuid4().hex[:8]}"
+
+def acquire_lock(db, job_id: str, worker_id: str, ttl_seconds: int = 300) -> bool:
+    """Acquire a distributed lock for a scheduled job."""
+    now = datetime.utcnow()
+    expires_at = now + timedelta(seconds=ttl_seconds)
+    
+    # Create unique index if it doesn't exist
+    db.scheduler_locks.create_index("job_id", unique=True)
+    
+    try:
+        result = db.scheduler_locks.find_one_and_update(
+            {
+                "job_id": job_id,
+                "$or": [
+                    {"expires_at": {"$lt": now}},  # expired lock
+                    {"owner_id": worker_id}        # same owner renewing
+                ]
+            },
+            {
+                "$set": {
+                    "owner_id": worker_id,
+                    "acquired_at": now,
+                    "expires_at": expires_at
+                }
+            },
+            return_document=True
+        )
+        if result:
+            return True
+            
+        # If no result, try to insert a new lock
+        try:
+            db.scheduler_locks.insert_one({
+                "job_id": job_id,
+                "owner_id": worker_id,
+                "acquired_at": now,
+                "expires_at": expires_at
+            })
+            return True
+        except Exception as e:
+            # Duplicate key error means someone else got the lock
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error acquiring lock for {job_id}: {e}")
+        return False
+
+def release_lock(db, job_id: str, worker_id: str):
+    """Release a distributed lock if owned by the current worker."""
+    db.scheduler_locks.delete_one({
+        "job_id": job_id,
+        "owner_id": worker_id
+    })
 
 async def generate_and_send_scheduled_reports():
     """
@@ -52,26 +108,15 @@ async def generate_and_send_scheduled_reports():
         if should_send:
             logger.info(f"Attempting to lock {freq} report for {email}")
             
-            # 1. Acquire distributed lock (expires after 5 minutes)
-            lock_cutoff = now - timedelta(minutes=5)
-            acquired = raw_db.scheduled_reports.find_one_and_update(
-                {
-                    "_id": report_id,
-                    "$or": [
-                        {"locked": {"$ne": True}},
-                        {"locked_at": {"$lt": lock_cutoff}}
-                    ]
-                },
-                {"$set": {"locked": True, "locked_at": now}},
-                return_document=True
-            )
-            
-            if not acquired:
-                logger.info(f"Report {report_id} is already locked by another worker.")
+            job_id = f"report_{report_id}"
+            if not acquire_lock(raw_db, job_id, WORKER_ID, ttl_seconds=300):
+                logger.info(f"Report {job_id} is already locked by another worker.")
                 continue
                 
             # 2. Double-check last_sent inside the lock to prevent race conditions
-            last_sent_locked = acquired.get("last_sent")
+            # Refetch report to get latest state
+            fresh_report = raw_db.scheduled_reports.find_one({"_id": report_id})
+            last_sent_locked = fresh_report.get("last_sent") if fresh_report else None
             should_send_locked = False
             if not last_sent_locked:
                 should_send_locked = True
@@ -86,10 +131,7 @@ async def generate_and_send_scheduled_reports():
                     
             if not should_send_locked:
                 # Another worker already completed it
-                raw_db.scheduled_reports.update_one(
-                    {"_id": report_id},
-                    {"$set": {"locked": False, "locked_at": None}}
-                )
+                release_lock(raw_db, job_id, WORKER_ID)
                 continue
 
             logger.info(f"Generating {freq} report for {email}")
@@ -143,16 +185,14 @@ async def generate_and_send_scheduled_reports():
                 # Update last_sent and release lock
                 raw_db.scheduled_reports.update_one(
                     {"_id": report_id},
-                    {"$set": {"last_sent": datetime.utcnow(), "locked": False, "locked_at": None}}
+                    {"$set": {"last_sent": datetime.utcnow()}}
                 )
+                release_lock(raw_db, job_id, WORKER_ID)
                 logger.info(f"✅ Successfully sent {freq} report to {email}")
             except Exception as e:
                 logger.error(f"❌ Failed to generate or send report for {email}: {e}")
                 # Release lock on failure so it can be retried
-                raw_db.scheduled_reports.update_one(
-                    {"_id": report_id},
-                    {"$set": {"locked": False, "locked_at": None}}
-                )
+                release_lock(raw_db, job_id, WORKER_ID)
 
 def start_scheduler():
     if not scheduler.running:

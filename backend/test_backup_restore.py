@@ -82,13 +82,18 @@ def main():
     
     print("--- 3. Testing Failure/Rollback ---")
     from bson.objectid import ObjectId
-    import gridfs
-    doc = db.backup_history.find_one({"_id": ObjectId(backup_id)})
-    grid_fs = gridfs.GridFS(db, collection="backups_fs")
-    grid_out = grid_fs.get(doc["gridfs_id"])
-    contents = grid_out.read()
-    bad_payload = json.loads(contents.decode("utf-8"))
-    bad_payload["fines"].append("not_a_dict_so_it_will_crash_the_restore")
+    # Instead of pulling the 51MB payload and blowing up MongoDB BSON limits, just mock a small bad payload
+    bad_payload = {
+        "version": "1.0",
+        "books": [],
+        "students": [],
+        "authors": [],
+        "categories": [],
+        "users": [],
+        "borrows": [],
+        "reservations": [],
+        "fines": ["not_a_dict_so_it_will_crash_the_restore"]
+    }
     
     # Save bad backup
     db.backup_history.delete_one({"_id": ObjectId("60d5ec49c1234567890abcde")})

@@ -1,676 +1,344 @@
-import { formatIST } from '../utils/dateUtils';
-import React, { useState, useEffect, useCallback } from 'react';
-import { getAnalyticsReports } from '../services/api';
-import './Dashboard.css';
+import React, { useState, useEffect, Suspense } from 'react';
+import axios from 'axios';
+import { Download, RefreshCw, Filter, Calendar, FileText, FileSpreadsheet, File, BarChart2, BookOpen, Users, Clock, AlertCircle, Bookmark, Archive, TrendingUp, Activity } from 'lucide-react';
+import api from '../services/api';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
-// Recovered Enterprise Components
-import SavedReports from '../components/reports/SavedReports';
-import ReportScheduler from '../components/reports/ReportScheduler';
-import AIReportAssistant from '../components/reports/AIReportAssistant';
-import ExecutiveReport from '../components/reports/ExecutiveReport';
-import FinancialAnalytics from '../components/reports/FinancialAnalytics';
-import { BorrowActivityHeatmap } from '../components/DashboardCharts';
+// Components
+import { ExecutiveKPIs, SectionCard, EmptyState } from '../components/reports/ReportsCore';
+import { CirculationSection, CategorySection, BorrowingBehaviourHeatmap, FineAnalytics } from '../components/reports/ReportsCharts';
+import { BooksTables, AuthorTable, MemberTable, OverdueIntelligence } from '../components/reports/ReportsTables';
+import { HeatmapSection, MemberGrowthAnalytics, RealTimeActivity, SmartInsights, ReservationAnalytics, InventoryAnalytics, AcquisitionAnalytics } from '../components/reports/ReportsMisc';
+import { ReportsDetailedModal } from '../components/reports/ReportsDetailed';
 
-import { PageHeader } from '../components/layout/EnterpriseLibrary';
-
-// ─────────────────────────────────────────────────────────────
-// SVG Line Chart for trend data
-// ─────────────────────────────────────────────────────────────
-const TrendLineChart = ({ data, keys, colors }) => {
-  if (!data || data.length === 0) return (
-    <p style={{ color: 'var(--ink-soft)', textAlign: 'center', padding: '2rem' }}>No trend data for selected period.</p>
-  );
-
-  const W = 580, H = 180;
-  const PAD = { top: 12, bottom: 32, left: 36, right: 12 };
-  const innerW = W - PAD.left - PAD.right;
-  const innerH = H - PAD.top - PAD.bottom;
-
-  const allVals = data.flatMap(d => keys.map(k => d[k] || 0));
-  const maxVal = Math.max(...allVals, 1);
-
-  const toX = (i) => PAD.left + (i / (data.length - 1 || 1)) * innerW;
-  const toY = (v) => PAD.top + innerH - (v / maxVal) * innerH;
-
-  const labelStep = Math.ceil(data.length / 7);
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
-      {/* Grid */}
-      {[0, 0.25, 0.5, 0.75, 1].map((r, i) => {
-        const y = PAD.top + innerH * (1 - r);
-        return (
-          <g key={i}>
-            <line x1={PAD.left} x2={W - PAD.right} y1={y} y2={y}
-              stroke="rgba(226,211,179,0.3)" strokeWidth="1" strokeDasharray="4 4" />
-            <text x={PAD.left - 4} y={y + 3} textAnchor="end" fontSize="9" fill="#9ca3af">
-              {Math.round(maxVal * r)}
-            </text>
-          </g>
-        );
-      })}
-      {/* Lines */}
-      {keys.map((key, ki) => {
-        const pts = data.map((d, i) => `${toX(i)},${toY(d[key] || 0)}`).join(' ');
-        return (
-          <polyline key={key}
-            fill="none"
-            stroke={colors[ki]}
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            points={pts}
-          />
-        );
-      })}
-      {/* Dots on hover areas */}
-      {data.map((d, i) => (
-        <g key={i}>
-          {keys.map((key, ki) => (
-            <circle key={key}
-              cx={toX(i)} cy={toY(d[key] || 0)} r="3"
-              fill={colors[ki]} stroke="#fff" strokeWidth="1.5"
-            >
-              <title>{data[i].period}: {d[key] || 0}</title>
-            </circle>
-          ))}
-          {i % labelStep === 0 && (
-            <text x={toX(i)} y={H - 4} textAnchor="middle" fontSize="8" fill="#9ca3af">
-              {data[i].period.slice(-5)}
-            </text>
-          )}
-        </g>
-      ))}
-    </svg>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────
-// Stat summary card (compact)
-// ─────────────────────────────────────────────────────────────
-const SummaryCard = ({ label, value, color = '#D4A017', icon }) => (
-  <div style={{
-    background: '#fff', border: '1px solid rgba(226,211,179,0.55)',
-    borderRadius: '14px', padding: '1.4rem', display: 'flex',
-    alignItems: 'center', gap: '1rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)'
-  }}>
-    <div style={{
-      width: '44px', height: '44px', borderRadius: '10px',
-      background: `${color}18`, display: 'flex', alignItems: 'center',
-      justifyContent: 'center', color, flexShrink: 0
-    }}>
-      {icon}
-    </div>
-    <div>
-      <div style={{ fontSize: '0.82rem', fontWeight: '600', color: '#5c5549' }}>{label}</div>
-      <div style={{ fontSize: '1.5rem', fontWeight: '800', color, lineHeight: 1.1 }}>{value}</div>
-    </div>
-  </div>
-);
-
-// ─────────────────────────────────────────────────────────────
-// Export helpers (no external lib needed)
-// ─────────────────────────────────────────────────────────────
-
-function exportCSV(rows, filename) {
-  if (!rows || rows.length === 0) return;
-  const headers = Object.keys(rows[0]);
-  const csv = [
-    headers.join(','),
-    ...rows.map(r => headers.map(h => JSON.stringify(r[h] ?? '')).join(','))
-  ].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename + '.csv'; a.click();
-  URL.revokeObjectURL(url);
-}
-
-function exportHTML(title, headers, rows, filename) {
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${title}</title>
-<style>
-  body{font-family:Inter,Segoe UI,sans-serif;color:#1e1b15;padding:2rem;background:#fdfcf9}
-  h1{font-size:1.5rem;margin-bottom:.5rem;color:#D4A017}
-  p{font-size:.85rem;color:#5c5549;margin-bottom:1.5rem}
-  table{width:100%;border-collapse:collapse;font-size:.85rem}
-  th{background:#D4A017;color:#fff;padding:.6rem 1rem;text-align:left}
-  td{padding:.6rem 1rem;border-bottom:1px solid #f0e8d0}
-  tr:nth-child(even){background:#fbf7ed}
-</style></head>
-<body>
-<h1>${title}</h1>
-<p>Generated: ${formatIST(new Date())}</p>
-<table>
-  <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
-  <tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c ?? '—'}</td>`).join('')}</tr>`).join('')}</tbody>
-</table>
-</body></html>`;
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename + '.html'; a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ─────────────────────────────────────────────────────────────
-// Tab button
-// ─────────────────────────────────────────────────────────────
-const TabBtn = ({ label, active, onClick, count }) => (
-  <button
-    className={`premium-tab ${active ? 'active' : ''}`}
-    onClick={onClick}
-    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-  >
-    {label}
-    {count !== undefined && (
-      <span style={{
-        background: active ? '#D4A017' : '#e5e7eb',
-        color: active ? '#fff' : '#374151',
-        borderRadius: '999px', padding: '0.05rem 0.4rem',
-        fontSize: '0.72rem', fontWeight: '800'
-      }}>{count}</span>
-    )}
-  </button>
-);
-
-// ─────────────────────────────────────────────────────────────
-// Reports Page
-// ─────────────────────────────────────────────────────────────
-const GRANULARITIES = [
-  { value: 'daily', label: 'Daily', defaultPeriod: 30 },
-  { value: 'weekly', label: 'Weekly', defaultPeriod: 12 },
-  { value: 'monthly', label: 'Monthly', defaultPeriod: 12 },
-];
+const BASE_URL = '/enterprise_analytics';
 
 const Reports = () => {
-  const [granularity, setGranularity] = useState('monthly');
-  const [period, setPeriod] = useState(12);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [reportData, setReportData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [period, setPeriod] = useState('last_30_days');
+  const [isLoading, setIsLoading] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState(new Date());
+  const [detailedReportModal, setDetailedReportModal] = useState(null);
+  
+  // Data States
+  const [overview, setOverview] = useState(null);
+  const [circulation, setCirculation] = useState(null);
+  const [books, setBooks] = useState(null);
+  const [categories, setCategories] = useState(null);
+  const [authors, setAuthors] = useState(null);
+  const [members, setMembers] = useState(null);
+  const [behaviour, setBehaviour] = useState(null);
+  const [heatmap, setHeatmap] = useState(null);
+  const [growth, setGrowth] = useState(null);
+  const [activity, setActivity] = useState(null);
+  const [insights, setInsights] = useState(null);
 
-  // Fine filter
-  const [fineFilter, setFineFilter] = useState('all'); // 'all' | 'paid' | 'unpaid'
-  // Issue/Return filter
-  const [txFilter, setTxFilter] = useState('all'); // 'all' | 'issued' | 'returned'
-  // Search
-  const [search, setSearch] = useState('');
-
-  const load = useCallback(async () => {
+  const fetchSection = async (endpoint, setter) => {
     try {
-      setLoading(true);
-      setError('');
-      const data = await getAnalyticsReports(granularity, period);
-      setReportData(data);
-    } catch (e) {
-      setError('Failed to load reports. Make sure the backend is running.');
-      console.error(e);
-    } finally {
-      setLoading(false);
+      const { data } = await api.get(`${BASE_URL}/${endpoint}?period=${period}`);
+      setter(data);
+    } catch (err) {
+      console.error(`Failed to fetch ${endpoint}`, err);
     }
-  }, [granularity, period]);
-
-  useEffect(() => { load(); }, [load]);
-
-  // ── Granularity switcher resets period ──
-  const handleGranChange = (g) => {
-    const preset = GRANULARITIES.find(x => x.value === g);
-    setGranularity(g);
-    setPeriod(preset?.defaultPeriod || 12);
   };
 
-  const handleLoadSavedReport = (type, period) => {
-    setGranularity(type);
-    setPeriod(period);
-    setActiveTab('overview');
-    load();
+  const loadData = async () => {
+    setIsLoading(true);
+    // 1. Above the fold (blocking for smoothness)
+    await Promise.all([
+      fetchSection('overview', setOverview),
+      fetchSection('circulation', setCirculation)
+    ]);
+    setIsLoading(false);
+    setLastRefreshed(new Date());
+
+    // 2. Below the fold (non-blocking lazy load)
+    fetchSection('growth', setGrowth);
+    fetchSection('activity', setActivity);
+    fetchSection('insights', setInsights);
   };
 
-  const fmt = (iso) => {
-    if (!iso) return '—';
-    return formatIST(iso);
+  useEffect(() => {
+    loadData();
+  }, [period]);
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      const { data } = await api.get(`${BASE_URL}/export-all?period=${period}`);
+      const wb = XLSX.utils.book_new();
+      
+      for (const [reportName, reportData] of Object.entries(data)) {
+        if (reportData && reportData.length > 0) {
+          const ws = XLSX.utils.json_to_sheet(reportData);
+          XLSX.utils.book_append_sheet(wb, ws, reportName.substring(0, 31));
+        }
+      }
+      
+      XLSX.writeFile(wb, `SmartLibrary_Reports_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (err) {
+      console.error('Failed to export Excel', err);
+      alert('Export failed. Please try again.');
+    }
+    setIsExporting(false);
   };
-
-  // Filtered fines
-  const filteredFines = (reportData?.fine_list || []).filter(f => {
-    const matchFilter = fineFilter === 'all' || (fineFilter === 'paid' ? f.paid : !f.paid);
-    const matchSearch = !search || f.student_name.toLowerCase().includes(search.toLowerCase()) ||
-      f.book_title.toLowerCase().includes(search.toLowerCase()) ||
-      (f.student_id || '').toLowerCase().includes(search.toLowerCase());
-    return matchFilter && matchSearch;
-  });
-
-  // Filtered transactions
-  const filteredTx = (reportData?.issue_return_list || []).filter(tx => {
-    const matchFilter = txFilter === 'all' || tx.status === txFilter;
-    const matchSearch = !search || tx.student_name.toLowerCase().includes(search.toLowerCase()) ||
-      tx.book_title.toLowerCase().includes(search.toLowerCase()) ||
-      (tx.student_id || '').toLowerCase().includes(search.toLowerCase());
-    return matchFilter && matchSearch;
-  });
-
-  // ── Export handlers ──
-  const handleExportFinesCSV = () => {
-    exportCSV(filteredFines.map(f => ({
-      'Student ID': f.student_id,
-      'Student Name': f.student_name,
-      'Book Title': f.book_title,
-      'Amount (₹)': f.amount,
-      'Reason': f.reason,
-      'Generated At': fmt(f.created_at),
-      'Status': f.paid ? 'Paid' : 'Unpaid'
-    })), `fines_report_${granularity}_${new Date().toISOString().slice(0, 10)}`);
-  };
-
-  const handleExportFinesPDF = () => {
-    exportHTML(
-      `Fine Report — ${granularity.charAt(0).toUpperCase() + granularity.slice(1)} (${period} periods)`,
-      ['Student ID', 'Student Name', 'Book Title', 'Amount (₹)', 'Reason', 'Generated At', 'Status'],
-      filteredFines.map(f => [f.student_id, f.student_name, f.book_title, `₹${f.amount}`, f.reason, fmt(f.created_at), f.paid ? 'Paid' : 'Unpaid']),
-      `fines_report_${granularity}_${new Date().toISOString().slice(0, 10)}`
-    );
-  };
-
-  const handleExportTxCSV = () => {
-    exportCSV(filteredTx.map(tx => ({
-      'Student ID': tx.student_id,
-      'Student Name': tx.student_name,
-      'Book Title': tx.book_title,
-      'Issue Date': fmt(tx.issue_date),
-      'Due Date': fmt(tx.due_date),
-      'Return Date': fmt(tx.return_date),
-      'Status': tx.status
-    })), `transactions_${granularity}_${new Date().toISOString().slice(0, 10)}`);
-  };
-
-  const handleExportTxPDF = () => {
-    exportHTML(
-      `Issue / Return Report — ${granularity.charAt(0).toUpperCase() + granularity.slice(1)} (${period} periods)`,
-      ['Student ID', 'Student Name', 'Book', 'Issued', 'Due', 'Returned', 'Status'],
-      filteredTx.map(tx => [tx.student_id, tx.student_name, tx.book_title, fmt(tx.issue_date), fmt(tx.due_date), fmt(tx.return_date), tx.status]),
-      `transactions_${granularity}_${new Date().toISOString().slice(0, 10)}`
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="dashboard-loading">
-        <div className="spinner" />
-        <span>Compiling analytical reports…</span>
-      </div>
-    );
-  }
-
-  const { summary, trend } = reportData || { summary: {}, trend: [] };
 
   return (
-    <div className="premium-page-wrapper">
-      {/* ── Header ── */}
-      <PageHeader
-        title="Analytical Reports"
-        subtitle={`${granularity.charAt(0).toUpperCase() + granularity.slice(1)} · Last ${period} periods`}
-      >
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div className="premium-tab-container" style={{ padding: '0.2rem' }}>
-            {GRANULARITIES.map(g => (
-              <button
-                key={g.value}
-                onClick={() => handleGranChange(g.value)}
-                className={`premium-tab ${granularity === g.value ? 'active' : ''}`}
-                style={{ padding: '0.35rem 0.8rem', minWidth: 'auto' }}
-              >
-                {g.label}
-              </button>
-            ))}
-          </div>
-          <div className="premium-input-wrapper no-icon" style={{ margin: 0, minWidth: '150px' }}>
-            <select
-              value={period}
-              onChange={e => setPeriod(Number(e.target.value))}
-            >
-              {granularity === 'daily'
-                ? [7, 14, 30, 60, 90].map(v => <option key={v} value={v}>Last {v} days</option>)
-                : granularity === 'weekly'
-                  ? [4, 8, 12, 24, 52].map(v => <option key={v} value={v}>Last {v} weeks</option>)
-                  : [3, 6, 12, 24].map(v => <option key={v} value={v}>Last {v} months</option>)
-              }
-            </select>
-          </div>
-          <button className="add-btn" onClick={load} style={{ gap: '0.5rem', display: 'flex', alignItems: 'center' }}>
-            ↻ Refresh
+    <div style={{ padding: '20px 24px', width: '100%', background: '#f5f4ef', minHeight: '100vh', boxSizing: 'border-box', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      
+      {/* HEADER */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#1e293b', fontWeight: 700 }}>Reports & Analytics</h1>
+          <p style={{ margin: '0.1rem 0 0 0', color: '#64748b', fontSize: '0.85rem' }}>Real-time library intelligence and insights • Last updated {lastRefreshed.toLocaleTimeString()}</p>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <select 
+            value={period} 
+            onChange={(e) => setPeriod(e.target.value)}
+            style={{ padding: '0.4rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none', background: 'white', fontWeight: 500, fontSize: '0.85rem', height: '34px' }}
+          >
+            <option value="last_7_days">Last 7 Days</option>
+            <option value="last_30_days">Last 30 Days</option>
+            <option value="last_3_months">Last 3 Months</option>
+            <option value="this_year">This Year</option>
+            <option value="all_time">All Time</option>
+          </select>
+          <button onClick={loadData} style={{ padding: '0 0.5rem', height: '34px', borderRadius: '6px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Refresh">
+            <RefreshCw size={16} color="#64748b" className={isLoading ? "animate-spin" : ""} />
+          </button>
+          <button style={{ padding: '0 0.75rem', height: '34px', borderRadius: '6px', border: '1px solid #D4A017', background: '#D4A017', color: 'white', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }} onClick={() => setDetailedReportModal('Circulation Report')}>
+            <Download size={14} /> Export
           </button>
         </div>
-      </PageHeader>
-
-      {error && (
-        <div style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', padding: '1rem', borderRadius: '12px', fontWeight: 'bold', marginTop: '1rem' }}>
-          {error}
-        </div>
-      )}
-
-      {/* ── Summary KPI cards ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-        <SavedReports onLoadReport={handleLoadSavedReport} currentConfig={{ type: granularity, period }} />
-        <ReportScheduler />
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.2rem', marginTop: '1.5rem' }}>
-        <SummaryCard label="Total Issues" value={summary.total_issues ?? 0} color="#3b82f6"
-          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>} />
-        <SummaryCard label="Total Returns" value={summary.total_returns ?? 0} color="#16a34a"
-          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>} />
-        <SummaryCard label="Overdue" value={summary.overdue ?? 0} color="#ea580c"
-          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>} />
-        <SummaryCard label="Fines Generated" value={`₹${summary.total_fines_generated ?? 0}`} color="#dc2626"
-          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>} />
-        <SummaryCard label="Fines Collected" value={`₹${summary.fines_collected ?? 0}`} color="#D4A017"
-          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="7" /><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" /></svg>} />
       </div>
 
-      {/* ── Tabs ── */}
-      <div className="premium-tab-container" style={{ marginTop: '2rem' }}>
-        <TabBtn label="Overview" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
-        <TabBtn label="Issue / Return" active={activeTab === 'issue_return'} onClick={() => setActiveTab('issue_return')} count={filteredTx.length} />
-        <TabBtn label="Fine Reports" active={activeTab === 'fines'} onClick={() => setActiveTab('fines')} count={filteredFines.length} />
-        <TabBtn label="Enterprise AI & Automation" active={activeTab === 'ai_automation'} onClick={() => setActiveTab('ai_automation')} />
+    {/* GLOBAL FILTERS */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center', overflowX: 'auto', paddingBottom: '4px' }}>
+        {['Category', 'Author', 'Book', 'Member', 'Status'].map(filter => (
+          <select key={filter} style={{ padding: '0.35rem 1.75rem 0.35rem 0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0', outline: 'none', background: 'white', fontSize: '0.8rem', color: '#475569', minWidth: '120px', height: '32px', appearance: 'none', backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394a3b8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.5rem top 50%', backgroundSize: '0.55rem auto' }}>
+            <option value="">All {filter}s</option>
+          </select>
+        ))}
+        <button style={{ padding: '0 0.5rem', height: '32px', borderRadius: '6px', border: 'none', background: 'transparent', color: '#64748b', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <Filter size={12} /> Clear Filters
+        </button>
       </div>
 
-      {/* ════════════════════════════════════════
-          TAB: OVERVIEW
-      ════════════════════════════════════════ */}
-      {activeTab === 'overview' && (
-        <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <ExecutiveReport summary={summary} trend={trend} />
-          {/* Calendar Heatmap Wrapper */}
-          {trend.length > 0 && (
-            <div className="chart-print-wrapper" style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
-              <BorrowActivityHeatmap trend={{
-                labels: trend.map(t => t.period),
-                issues: trend.map(t => t.issues),
-                returns: trend.map(t => t.returns)
-              }} />
+      {isLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1400px', margin: '0 auto', overflowX: 'hidden' }}>
+          <section>
+            <div style={{ marginBottom: '8px' }}>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '1rem', color: '#1e293b' }}>Executive Summary</h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Core library operational metrics</p>
             </div>
-          )}
-          {/* Trend Chart */}
-          <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.75rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h4 style={{ margin: 0, fontWeight: '800', color: '#1e1b15' }}>Issues · Returns · Fines Trend</h4>
-              <div style={{ display: 'flex', gap: '1rem', fontSize: '0.78rem', fontWeight: '700' }}>
-                {[['Issues', '#3b82f6'], ['Returns', '#16a34a'], ['Fines (₹)', '#dc2626']].map(([l, c]) => (
-                  <span key={l} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <span style={{ width: '10px', height: '10px', background: c, borderRadius: '2px', display: 'inline-block' }} />{l}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <TrendLineChart
-              data={trend}
-              keys={['issues', 'returns', 'fines']}
-              colors={['#3b82f6', '#16a34a', '#dc2626']}
-            />
-          </div>
-
-          {/* Progress bars — ratio analysis */}
-          <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.75rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
-            <h4 style={{ margin: '0 0 1.5rem 0', fontWeight: '800', color: '#1e1b15' }}>Circulation Summary</h4>
-            {[
-              { label: 'Return Rate', value: summary.total_issues > 0 ? Math.round((summary.total_returns / summary.total_issues) * 100) : 0, color: '#16a34a' },
-              { label: 'Overdue Rate', value: summary.total_issues > 0 ? Math.round((summary.overdue / summary.total_issues) * 100) : 0, color: '#ea580c' },
-              { label: 'Fine Collection Rate', value: (summary.total_fines_generated || 0) > 0 ? Math.round(((summary.fines_collected || 0) / summary.total_fines_generated) * 100) : 0, color: '#D4A017' },
-            ].map(({ label, value, color }) => (
-              <div key={label} style={{ marginBottom: '1.2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '0.9rem', marginBottom: '0.4rem' }}>
-                  <span>{label}</span><span style={{ color }}>{value}%</span>
-                </div>
-                <div style={{ background: '#f1f5f9', borderRadius: '6px', height: '10px', overflow: 'hidden' }}>
-                  <div style={{ width: `${value}%`, height: '100%', background: color, borderRadius: '6px', transition: 'width 0.7s ease' }} />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Trend Table */}
-          <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.75rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h4 style={{ margin: 0, fontWeight: '800', color: '#1e1b15' }}>Period Breakdown</h4>
-              <button
-                onClick={() => exportCSV(trend, `trend_${granularity}_${new Date().toISOString().slice(0, 10)}`)}
-                style={{
-                  padding: '0.4rem 0.9rem', background: 'rgba(212,160,23,0.1)', color: '#b3861b',
-                  border: '1.5px solid rgba(212,160,23,0.3)', borderRadius: '8px',
-                  fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer'
-                }}
-              >
-                ⬇ Export CSV
-              </button>
-            </div>
-            <div className="table-responsive">
-              <table className="dashboard-table">
-                <thead>
-                  <tr>
-                    <th>Period</th>
-                    <th style={{ textAlign: 'right' }}>Issues</th>
-                    <th style={{ textAlign: 'right' }}>Returns</th>
-                    <th style={{ textAlign: 'right' }}>Fines (₹)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trend.length === 0 ? (
-                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--ink-soft)' }}>No data in selected period.</td></tr>
-                  ) : (
-                    [...trend].reverse().map((row, i) => (
-                      <tr key={i}>
-                        <td style={{ fontWeight: '700' }}>{row.period}</td>
-                        <td style={{ textAlign: 'right', color: '#3b82f6', fontWeight: '700' }}>{row.issues}</td>
-                        <td style={{ textAlign: 'right', color: '#16a34a', fontWeight: '700' }}>{row.returns}</td>
-                        <td style={{ textAlign: 'right', color: '#dc2626', fontWeight: '700' }}>₹{row.fines}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ════════════════════════════════════════
-          TAB: ISSUE / RETURN
-      ════════════════════════════════════════ */}
-      {activeTab === 'issue_return' && (
-        <div style={{ marginTop: '1.5rem' }}>
-          <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.75rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
-            {/* Controls */}
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
-              <div className="premium-input-wrapper no-icon" style={{ flex: 1, minWidth: '200px', margin: 0 }}>
-                <input
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Search student, book…"
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '0.4rem', background: '#f5f5f5', padding: '0.3rem', borderRadius: '10px' }}>
-                {[['All', 'all'], ['Issued', 'issued'], ['Returned', 'returned']].map(([l, v]) => (
-                  <button key={v} onClick={() => setTxFilter(v)} style={{
-                    padding: '0.35rem 0.8rem', borderRadius: '7px', border: 'none',
-                    background: txFilter === v ? '#3b82f6' : 'transparent',
-                    color: txFilter === v ? '#fff' : '#5c5549',
-                    fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer'
-                  }}>{l}</button>
-                ))}
-              </div>
-              <button onClick={handleExportTxCSV} style={{
-                padding: '0.45rem 0.9rem', background: 'rgba(212,160,23,0.1)', color: '#b3861b',
-                border: '1.5px solid rgba(212,160,23,0.3)', borderRadius: '8px',
-                fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer'
-              }}>⬇ CSV</button>
-              <button onClick={handleExportTxPDF} style={{
-                padding: '0.45rem 0.9rem', background: 'rgba(37,99,235,0.08)', color: '#2563eb',
-                border: '1.5px solid rgba(37,99,235,0.2)', borderRadius: '8px',
-                fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer'
-              }}>🖨 Print / PDF</button>
-            </div>
-
-            <div className="table-responsive">
-              <table className="dashboard-table">
-                <thead>
-                  <tr>
-                    <th>Student</th>
-                    <th>Book</th>
-                    <th>Issued</th>
-                    <th>Due</th>
-                    <th>Returned</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTx.length === 0 ? (
-                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--ink-soft)' }}>No records match your filter.</td></tr>
-                  ) : (
-                    filteredTx.map((tx, i) => {
-                      const isOverdue = tx.status === 'issued' && tx.due_date && new Date(tx.due_date) < new Date();
-                      return (
-                        <tr key={i}>
-                          <td>
-                            <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>{tx.student_name}</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--ink-soft)' }}>{tx.student_id}</div>
-                          </td>
-                          <td style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.book_title}</td>
-                          <td>{fmt(tx.issue_date)}</td>
-                          <td style={{ color: isOverdue ? '#dc2626' : 'inherit', fontWeight: isOverdue ? '700' : 'normal' }}>{fmt(tx.due_date)}</td>
-                          <td>{tx.return_date ? fmt(tx.return_date) : '—'}</td>
-                          <td>
-                            <span className="table-badge" style={{
-                              background: tx.status === 'returned' ? '#dcfce7' : isOverdue ? '#fee2e2' : '#dbeafe',
-                              color: tx.status === 'returned' ? '#166534' : isOverdue ? '#b91c1c' : '#1d4ed8'
-                            }}>
-                              {tx.status === 'returned' ? 'Returned' : isOverdue ? 'Overdue' : 'Issued'}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div style={{ marginTop: '0.75rem', fontSize: '0.82rem', color: 'var(--ink-soft)', fontWeight: '600' }}>
-              Showing {filteredTx.length} records
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ════════════════════════════════════════
-          TAB: FINE REPORTS
-      ════════════════════════════════════════ */}
-      {activeTab === 'fines' && (
-        <div style={{ marginTop: '1.5rem' }}>
-          <FinancialAnalytics summary={summary} />
-          <div style={{ background: '#fff', border: '1px solid rgba(226,211,179,0.55)', borderRadius: '16px', padding: '1.75rem', boxShadow: '0 6px 20px rgba(20,18,15,0.04)' }}>
-            {/* Fine summary mini cards */}
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.75rem', flexWrap: 'wrap' }}>
-              {[
-                { label: 'Total Generated', value: `₹${summary.total_fines_generated ?? 0}`, color: '#dc2626' },
-                { label: 'Collected', value: `₹${summary.fines_collected ?? 0}`, color: '#16a34a' },
-                { label: 'Pending', value: `₹${((summary.total_fines_generated ?? 0) - (summary.fines_collected ?? 0)).toFixed(2)}`, color: '#ea580c' },
-                { label: 'Fine Records', value: (reportData?.fine_list || []).length, color: '#D4A017' },
-              ].map(({ label, value, color }) => (
-                <div key={label} style={{ flex: '1', minWidth: '120px', background: `${color}0d`, border: `1.5px solid ${color}30`, borderRadius: '10px', padding: '0.9rem 1.1rem' }}>
-                  <div style={{ fontSize: '0.78rem', color, fontWeight: '700', marginBottom: '0.2rem' }}>{label}</div>
-                  <div style={{ fontSize: '1.3rem', fontWeight: '800', color }}>{value}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '16px' }}>
+              {[...Array(10)].map((_, i) => (
+                <div key={i} style={{ background: 'white', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', minHeight: '105px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.5rem' }}>
+                  <div style={{ width: '50%', height: '12px', background: '#f1f5f9', borderRadius: '4px' }}></div>
+                  <div style={{ width: '40%', height: '20px', background: '#e2e8f0', borderRadius: '4px' }}></div>
                 </div>
               ))}
             </div>
+          </section>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1400px', margin: '0 auto', overflowX: 'hidden' }}>
+          
+          {/* Executive Summary */}
+          <section>
+            <div style={{ marginBottom: '8px' }}>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '1rem', color: '#1e293b' }}>Executive Summary</h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Core library operational metrics</p>
+            </div>
+            <ExecutiveKPIs data={overview} />
+          </section>
 
-            {/* Controls */}
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.5rem', alignItems: 'center' }}>
-              <div className="premium-input-wrapper no-icon" style={{ flex: 1, minWidth: '200px', margin: 0 }}>
-                <input
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Search student, book…"
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '0.4rem', background: '#f5f5f5', padding: '0.3rem', borderRadius: '10px' }}>
-                {[['All', 'all'], ['Unpaid', 'unpaid'], ['Paid', 'paid']].map(([l, v]) => (
-                  <button key={v} onClick={() => setFineFilter(v)} style={{
-                    padding: '0.35rem 0.8rem', borderRadius: '7px', border: 'none',
-                    background: fineFilter === v ? '#dc2626' : 'transparent',
-                    color: fineFilter === v ? '#fff' : '#5c5549',
-                    fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer'
-                  }}>{l}</button>
-                ))}
-              </div>
-              <button onClick={handleExportFinesCSV} style={{
-                padding: '0.45rem 0.9rem', background: 'rgba(212,160,23,0.1)', color: '#b3861b',
-                border: '1.5px solid rgba(212,160,23,0.3)', borderRadius: '8px',
-                fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer'
-              }}>⬇ CSV</button>
-              <button onClick={handleExportFinesPDF} style={{
-                padding: '0.45rem 0.9rem', background: 'rgba(220,38,38,0.08)', color: '#b91c1c',
-                border: '1.5px solid rgba(220,38,38,0.2)', borderRadius: '8px',
-                fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer'
-              }}>🖨 Print / PDF</button>
-            </div>
+          {/* Circulation Analytics */}
+          <section>
+            <CirculationSection data={circulation} globalPeriod={period} />
+          </section>
 
-            <div className="table-responsive">
-              <table className="dashboard-table">
-                <thead>
-                  <tr>
-                    <th>Student</th>
-                    <th>Book</th>
-                    <th style={{ textAlign: 'right' }}>Amount</th>
-                    <th>Reason</th>
-                    <th>Generated</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredFines.length === 0 ? (
-                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--ink-soft)' }}>No fine records match your filter.</td></tr>
-                  ) : (
-                    filteredFines.map((f, i) => (
-                      <tr key={i}>
-                        <td>
-                          <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>{f.student_name}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--ink-soft)' }}>{f.student_id}</div>
-                        </td>
-                        <td style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.book_title}</td>
-                        <td style={{ textAlign: 'right', fontWeight: '800', color: f.paid ? '#16a34a' : '#dc2626' }}>
-                          ₹{f.amount}
-                        </td>
-                        <td style={{ fontSize: '0.82rem', color: 'var(--ink-soft)' }}>{f.reason}</td>
-                        <td style={{ fontSize: '0.82rem' }}>{fmt(f.created_at)}</td>
-                        <td>
-                          <span className="table-badge" style={{
-                            background: f.paid ? '#dcfce7' : '#fee2e2',
-                            color: f.paid ? '#166534' : '#b91c1c'
-                          }}>
-                            {f.paid ? '✓ Paid' : 'Unpaid'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+          {/* Book Analytics */}
+          <section>
+            <div style={{ marginBottom: '8px' }}>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '1rem', color: '#1e293b' }}>Book Analytics</h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Most borrowed, overdue and reserved books</p>
             </div>
-            <div style={{ marginTop: '0.75rem', fontSize: '0.82rem', color: 'var(--ink-soft)', fontWeight: '600' }}>
-              Showing {filteredFines.length} fine records ·{' '}
-              Total: ₹{filteredFines.reduce((s, f) => s + (f.amount || 0), 0).toFixed(2)}
+            <BooksTables data={books} />
+          </section>
+
+          {/* Category & Author Analytics */}
+          <section>
+            <div style={{ marginBottom: '8px' }}>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '1rem', color: '#1e293b' }}>Category & Author Analytics</h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Demand by subject and author performance</p>
             </div>
-          </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '16px' }}>
+              <CategorySection globalPeriod={period} />
+              <AuthorTable globalPeriod={period} />
+            </div>
+          </section>
+
+          {/* Member Analytics */}
+          <section>
+            <div style={{ marginBottom: '8px' }}>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '1rem', color: '#1e293b' }}>Member Analytics & Borrowing Behaviour</h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Top borrowers and return patterns</p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '7fr 3fr', gap: '16px' }}>
+              <MemberTable globalPeriod={period} />
+              <BorrowingBehaviourHeatmap globalPeriod={period} />
+            </div>
+          </section>
+          
+          {/* Fines & Overdue Analytics */}
+          <section>
+            <div style={{ marginBottom: '8px' }}>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '1rem', color: '#1e293b' }}>Fine & Overdue Analytics</h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Fine collection metrics and overdue books</p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '7fr 3fr', gap: '16px' }}>
+              <FineAnalytics globalPeriod={period} />
+              <OverdueIntelligence globalPeriod={period} />
+            </div>
+          </section>
+
+          {/* Inventory, Reservations & Acquisitions */}
+          <section>
+            <div style={{ marginBottom: '8px' }}>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '1rem', color: '#1e293b' }}>Inventory, Reservations & Acquisitions</h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Library stock utilization and new additions</p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '16px' }}>
+              <ReservationAnalytics globalPeriod={period} />
+              <InventoryAnalytics />
+              <AcquisitionAnalytics globalPeriod={period} />
+            </div>
+          </section>
+          
+          {/* Growth & Activity */}
+          <section>
+            <div style={{ marginBottom: '8px' }}>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '1rem', color: '#1e293b' }}>Growth & Activity</h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Member growth trends and real-time operations</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <MemberGrowthAnalytics globalPeriod={period} />
+              <div style={{ display: 'grid', gridTemplateColumns: '7fr 3fr', gap: '16px', alignItems: 'start' }}>
+                <RealTimeActivity />
+                <SmartInsights globalPeriod={period} />
+              </div>
+            </div>
+          </section>
+
+          {/* DETAILED REPORTS */}
+          <section>
+            <div style={{ marginBottom: '12px' }}>
+              <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: '#1e293b' }}>Detailed Reports</h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>Explore and export granular library data</p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+              {[
+                { name: 'Circulation Report', desc: 'Issues, returns and circulation performance', icon: <BarChart2 size={20} /> },
+                { name: 'Book Report', desc: 'Book inventory, availability and demand', icon: <BookOpen size={20} /> },
+                { name: 'Member Report', desc: 'Member borrowing and engagement activity', icon: <Users size={20} /> },
+                { name: 'Overdue Report', desc: 'Critical overdue books and members', icon: <Clock size={20} /> },
+                { name: 'Fine Report', desc: 'Generated fines and collection tracking', icon: <AlertCircle size={20} /> },
+                { name: 'Reservation Report', desc: 'Reservation demand and waiting times', icon: <Bookmark size={20} /> },
+                { name: 'Inventory Report', desc: 'Total library inventory breakdown', icon: <Archive size={20} /> },
+                { name: 'Acquisition Report', desc: 'Newly added books and their performance', icon: <TrendingUp size={20} /> },
+                { name: 'Activity Report', desc: 'Raw system activity and audit logs', icon: <Activity size={20} /> }
+              ].map(report => (
+                <div key={report.name} style={{ background: 'white', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                    <div style={{ background: '#f8fafc', padding: '0.5rem', borderRadius: '8px', fontSize: '1.1rem', border: '1px solid #f1f5f9' }}>
+                      {report.icon}
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', color: '#1e293b', fontSize: '1rem' }}>{report.name}</h4>
+                      <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem', lineHeight: 1.4 }}>{report.desc}</p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: 'auto' }}>
+                    <button onClick={() => setDetailedReportModal(report.name)} style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid #D4A017', background: 'white', color: '#D4A017', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem', transition: 'all 0.2s' }} onMouseOver={e => { e.currentTarget.style.background = '#D4A017'; e.currentTarget.style.color = 'white'; }} onMouseOut={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.color = '#D4A017'; }}>
+                      View Report
+                    </button>
+                    <button onClick={() => setDetailedReportModal(report.name)} style={{ padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem' }} onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'} onMouseOut={e => e.currentTarget.style.background = '#f8fafc'}>
+                      Export
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* EXPORT CENTER */}
+          <section style={{ marginTop: '3rem' }}>
+            <div style={{ marginBottom: '1rem' }}>
+              <h3 style={{ margin: '0 0 4px 0', fontSize: '1.25rem', color: '#1e293b' }}>Export Center</h3>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>Download filtered reports and analytics</p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+              <div style={{ background: 'white', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <div style={{ background: '#fef2f2', padding: '0.5rem', borderRadius: '8px', color: '#dc2626' }}>
+                    <FileText size={24} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 2px 0', color: '#1e293b' }}>PDF</h4>
+                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>Professional report</p>
+                  </div>
+                </div>
+                <button onClick={() => setDetailedReportModal('Circulation Report')} style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: 'none', background: '#D4A017', color: 'white', fontWeight: 600, cursor: 'pointer' }}>
+                  Export PDF
+                </button>
+              </div>
+
+              <div style={{ background: 'white', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <div style={{ background: '#f8fafc', padding: '0.5rem', borderRadius: '8px', color: '#64748b' }}>
+                    <File size={24} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 2px 0', color: '#1e293b' }}>CSV</h4>
+                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>Raw report data</p>
+                  </div>
+                </div>
+                <button onClick={() => setDetailedReportModal('Circulation Report')} style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: 'white', color: '#1e293b', fontWeight: 600, cursor: 'pointer' }}>
+                  Export CSV
+                </button>
+              </div>
+
+              <div style={{ background: 'white', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <div style={{ background: '#f0fdf4', padding: '0.5rem', borderRadius: '8px', color: '#16a34a' }}>
+                    <FileSpreadsheet size={24} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 2px 0', color: '#1e293b' }}>Excel</h4>
+                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>Multi-sheet workbook</p>
+                  </div>
+                </div>
+                <button onClick={() => handleExportExcel(period)} style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: 'none', background: '#16a34a', color: 'white', fontWeight: 600, cursor: 'pointer' }}>
+                  Export Excel
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
       )}
-
-      {/* ════════════════════════════════════════
-          TAB: ENTERPRISE AI & AUTOMATION
-      ════════════════════════════════════════ */}
-      {activeTab === 'ai_automation' && (
-        <div style={{ marginTop: '1.5rem' }}>
-          <AIReportAssistant onLoadReport={handleLoadSavedReport} />
-        </div>
+      
+      {detailedReportModal && (
+        <ReportsDetailedModal 
+          reportType={detailedReportModal} 
+          period={period} 
+          onClose={() => setDetailedReportModal(null)} 
+        />
       )}
     </div>
   );

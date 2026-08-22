@@ -199,7 +199,8 @@ async def restore_backup(
         if file_size > 50 * 1024 * 1024:  # 50MB limit
             raise HTTPException(status_code=400, detail="Backup file is too large (max 50MB)")
             
-        contents = await file.read()
+        from ..utils.file_validation import validate_file_magic_bytes
+        contents = await validate_file_magic_bytes(file, ["application/json", "text/plain"])
         try:
             data = json.loads(contents.decode("utf-8"))
         except Exception:

@@ -293,17 +293,24 @@ async def bulk_delete_books(
 
     result = books = list(db.books.find({"_id": {"$in": object_ids}}))
     
+    # Pre-fetch all active borrows for these books
+    book_id_strs = [str(b["_id"]) for b in books]
+    active_borrows = list(db.borrows.find({"book_id": {"$in": book_id_strs}, "status": "issued"}, {"book_id": 1}))
+    active_borrow_book_ids = set([b["book_id"] for b in active_borrows])
+
+    # Pre-fetch all active reservations for these books
+    active_reservations = list(db.reservations.find({"book_id": {"$in": book_id_strs}, "status": {"$in": ["pending", "ready"]}}, {"book_id": 1}))
+    active_res_book_ids = set([r["book_id"] for r in active_reservations])
+
     # Safe delete checks for bulk
     for book in books:
         book_id_str = str(book["_id"])
-        active_borrows = db.borrows.count_documents({"book_id": book_id_str, "status": "issued"})
-        if active_borrows > 0:
+        if book_id_str in active_borrow_book_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot delete book {book.get('title')}. It has active borrow(s)."
             )
-        active_reservations = db.reservations.count_documents({"book_id": book_id_str, "status": {"$in": ["pending", "ready"]}})
-        if active_reservations > 0:
+        if book_id_str in active_res_book_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot delete book {book.get('title')}. It has active reservation(s)."
@@ -375,8 +382,8 @@ async def import_books_csv(
             detail="Only CSV files are accepted"
         )
 
-    # Read and decode file
-    contents = await file.read()
+    from ..utils.file_validation import validate_file_magic_bytes
+    contents = await validate_file_magic_bytes(file, ["text/csv"])
     
     # P2-27: Upload security - file size limit
     if len(contents) > 5 * 1024 * 1024:  # 5MB

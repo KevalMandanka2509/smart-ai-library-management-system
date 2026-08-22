@@ -65,7 +65,7 @@ const Dashboard = () => {
     }
   }, []);
 
-  const { books, borrows, students, fines, popular_books, top_students, trend, recent_transactions } = data || {};
+  const { books, borrows, students, fines, popular_books = [], top_students = [], trend, recent_transactions = [] } = data || {};
 
   // Rebuild trend data dynamically according to selected trendRange (7D, 30D, 90D)
   const filteredTrend = useMemo(() => {

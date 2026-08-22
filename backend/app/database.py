@@ -68,33 +68,15 @@ class Database:
     
     def _ensure_index(self, collection, keys, **kwargs):
         """
-        Check existing index specs on collection.
-        If an index with conflicting options exists, drop it and recreate.
-        If identical spec exists, skip creation.
+        Idempotent index creation. Never drops existing indexes.
+        If an index with conflicting options exists, it logs a warning instead of dropping it.
         """
         try:
             collection.create_index(keys, **kwargs)
         except Exception as e:
             err_msg = str(e)
             if "IndexKeySpecsConflict" in err_msg or "IndexOptionsConflict" in err_msg or "codeName" in err_msg:
-                # Find index name to drop
-                existing_indexes = collection.index_information()
-                for idx_name, idx_info in existing_indexes.items():
-                    if idx_name == "_id_":
-                        continue
-                    # Match key spec
-                    keys_spec = keys if isinstance(keys, list) else [(keys, ASCENDING)]
-                    if idx_info.get("key") == keys_spec or idx_name == kwargs.get("name"):
-                        try:
-                            collection.drop_index(idx_name)
-                            logger.info(f"Dropped conflicting index '{idx_name}' from '{collection.name}'")
-                        except Exception as drop_err:
-                            logger.warning(f"Could not drop index '{idx_name}': {drop_err}")
-                # Re-try creation after drop
-                try:
-                    collection.create_index(keys, **kwargs)
-                except Exception as retry_err:
-                    logger.error(f"Failed to create index {keys} on {collection.name}: {retry_err}")
+                logger.warning(f"Index conflict on {collection.name} for keys {keys}. Existing index will NOT be dropped. Error: {e}")
             else:
                 logger.warning(f"Index creation notice on {collection.name}: {e}")
 

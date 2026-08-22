@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PageHeader, DataTable, StatusBadge, EmptyState } from '../components/layout/EnterpriseLibrary';
 import { Mail, Trash2, CheckCircle, MailOpen } from 'lucide-react';
-import api from '../services/api';
+import { api } from '../services/api';
 import { formatIST } from '../utils/dateUtils';
 import './ContactMessages.css';
 

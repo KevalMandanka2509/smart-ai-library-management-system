@@ -142,10 +142,9 @@ async def upload_logo(
     db=Depends(get_db),
     current_admin=Depends(get_current_admin)
 ):
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image")
-    
-    contents = await file.read()
+    from ..utils.file_validation import validate_file_magic_bytes
+    contents = await validate_file_magic_bytes(file, ["image/jpeg", "image/png", "image/gif"])
+
     if len(contents) > 2 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Image size cannot exceed 2MB")
 
@@ -163,10 +162,9 @@ async def upload_favicon(
     db=Depends(get_db),
     current_admin=Depends(get_current_admin)
 ):
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image")
-    
-    contents = await file.read()
+    from ..utils.file_validation import validate_file_magic_bytes
+    contents = await validate_file_magic_bytes(file, ["image/jpeg", "image/png", "image/gif"])
+
     if len(contents) > 512 * 1024: # 512KB limit
         raise HTTPException(status_code=400, detail="Favicon size cannot exceed 512KB")
 
@@ -229,7 +227,9 @@ async def restore_database_backup(
     if file_size > 50 * 1024 * 1024:  # 50MB limit
         raise HTTPException(status_code=400, detail="Backup file is too large (max 50MB)")
         
-    contents = await file.read()
+    from ..utils.file_validation import validate_file_magic_bytes
+    contents = await validate_file_magic_bytes(file, ["application/json", "text/plain"])
+    
     try:
         data = json.loads(contents.decode("utf-8"))
     except Exception:
