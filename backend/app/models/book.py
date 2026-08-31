@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 def book_document(data: dict) -> dict:
     """Create MongoDB document from book data"""
@@ -30,8 +30,8 @@ def book_document(data: dict) -> dict:
         "barcode_value": barcode_val,
         "qr_value": qr_val,
         "is_available": data.get("available_copies", 1) > 0,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(timezone.utc).replace(tzinfo=None),
+        "updated_at": datetime.now(timezone.utc).replace(tzinfo=None)
     }
 
 def serialize_book(book: dict) -> dict:
@@ -44,7 +44,7 @@ def serialize_book(book: dict) -> dict:
         book.setdefault("total_copies", 1)
         book.setdefault("available_copies", 1)
         book.setdefault("price", 0.0)
-        book.setdefault("created_at", datetime.utcnow())
+        book.setdefault("created_at", datetime.now(timezone.utc).replace(tzinfo=None))
     return book
 
 def serialize_books(books: list) -> list:

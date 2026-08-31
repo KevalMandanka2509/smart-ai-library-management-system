@@ -8,7 +8,8 @@ import { AnalyticsCard, PageHeader, ChartCard, DataTable } from '../components/l
 
 import './Dashboard.css';
 
-import { Sparkline, BorrowTrendChart, BorrowActivityHeatmap, DonutChart, HBar, KpiCard, COLORS } from '../components/DashboardCharts';
+import { Sparkline, BorrowTrendChart, BorrowActivityHeatmap, DonutChart, HBar, KpiCard } from '../components/DashboardCharts';
+const COLORS = ['#D4A017', '#3b82f6', '#16a34a', '#ea580c', '#8b5cf6', '#ec4899', '#0ea5e9', '#f59e0b'];
 // ─────────────────────────────────────────────────────────────
 // Main Dashboard
 // ─────────────────────────────────────────────────────────────
@@ -23,24 +24,6 @@ const Dashboard = () => {
   const [txSearch, setTxSearch] = useState('');
   const [txPage, setTxPage] = useState(1);
 
-  useEffect(() => {
-    const stored = localStorage.getItem('user');
-    if (stored) {
-      try {
-        const p = JSON.parse(stored);
-        setUserName(p.full_name || 'Member');
-        setUserRole(p.role || 'member');
-      } catch (_) { }
-    }
-    load();
-
-    // Auto-sync dashboard metrics: fetch backend state updates every 60 seconds
-    const interval = setInterval(() => {
-      loadSilent();
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -64,6 +47,27 @@ const Dashboard = () => {
       console.error('Silent auto-sync failed:', e);
     }
   }, []);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('user');
+    if (stored) {
+      try {
+        const p = JSON.parse(stored);
+        setUserName(p.full_name || 'Member');
+        setUserRole(p.role || 'member');
+      } catch (_) { 
+        console.error("Failed to parse user from local storage.");
+      }
+    }
+    load();
+
+    // Auto-sync dashboard metrics: fetch backend state updates every 60 seconds
+    const interval = setInterval(() => {
+      loadSilent();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [load, loadSilent]);
 
   const { books, borrows, students, fines, popular_books = [], top_students = [], trend, recent_transactions = [] } = data || {};
 
@@ -109,8 +113,12 @@ const Dashboard = () => {
   const last14Issues = useMemo(() => trend?.issues ? trend.issues.slice(-14) : [], [trend]);
   const last14Returns = useMemo(() => trend?.returns ? trend.returns.slice(-14) : [], [trend]);
 
-  // Donut slices from genre data
-  const donutSlices = useMemo(() => (books?.by_genre || []).slice(0, 8).map((g) => ({ label: g.genre, value: g.count })), [books]);
+  // Donut slices from category data (using Reports endpoint data)
+  const donutSlices = useMemo(() => (books?.by_category || books?.by_genre || []).slice(0, 8).map((g) => ({ 
+    label: g.category || g.genre, 
+    value: g.count,
+    percentage: g.percentage
+  })), [books]);
 
   // Popular books max
   const maxBorrow = useMemo(() => popular_books?.length > 0 ? popular_books[0].borrow_count : 1, [popular_books]);
@@ -278,11 +286,17 @@ const Dashboard = () => {
             <ChartCard title="Books by Category">
               <div className="donut-chart-container">
                 <DonutChart slices={donutSlices} />
-                <div className="donut-legend" style={{ maxWidth: '120px' }}>
+                <div className="donut-legend" style={{ minWidth: '160px' }}>
                   {donutSlices.slice(0, 6).map((s, i) => (
-                    <div key={s.label} className="legend-item">
-                      <span className="legend-color" style={{ background: COLORS[i % COLORS.length] }} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label} ({s.value})</span>
+                    <div key={s.label} className="legend-item" style={{ display: 'flex', alignItems: 'center', marginBottom: '6px', width: '100%' }}>
+                      <span className="legend-color" style={{ background: COLORS[i % COLORS.length], flexShrink: 0, marginRight: '8px' }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{s.label}</span>
+                      <span style={{ fontWeight: 600, marginLeft: '8px' }}>{s.value}</span>
+                      {s.percentage !== undefined && (
+                        <span style={{ color: '#64748b', fontSize: '0.85em', marginLeft: '8px', minWidth: '40px', textAlign: 'right' }}>
+                          {s.percentage}%
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 def record_audit_log(
@@ -30,7 +30,7 @@ def record_audit_log(
             "action": action.upper(),
             "resource": resource,
             "details": details,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None)
         })
     except Exception as e:
         import logging

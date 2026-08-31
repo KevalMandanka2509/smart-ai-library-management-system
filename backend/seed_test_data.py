@@ -1,3 +1,4 @@
+from datetime import timezone
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 import datetime
@@ -29,17 +30,17 @@ borrows = [
     {
         "student_id": member_id,
         "book_id": str(book_ids[0]), # The Great Gatsby
-        "issue_date": datetime.datetime.utcnow() - datetime.timedelta(days=10),
-        "due_date": datetime.datetime.utcnow() + datetime.timedelta(days=4),
+        "issue_date": datetime.datetime.now(timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=10),
+        "due_date": datetime.datetime.now(timezone.utc).replace(tzinfo=None) + datetime.timedelta(days=4),
         "status": "issued"
     },
     {
         "student_id": member_id,
         "book_id": str(book_ids[2]), # To Kill a Mockingbird
-        "issue_date": datetime.datetime.utcnow() - datetime.timedelta(days=30),
-        "due_date": datetime.datetime.utcnow() - datetime.timedelta(days=16),
+        "issue_date": datetime.datetime.now(timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=30),
+        "due_date": datetime.datetime.now(timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=16),
         "status": "returned",
-        "return_date": datetime.datetime.utcnow() - datetime.timedelta(days=15)
+        "return_date": datetime.datetime.now(timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=15)
     }
 ]
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from bson import ObjectId
 import asyncio
 from ..utils.notification_helper import create_notification
@@ -172,8 +172,8 @@ async def issue_book(request: BorrowIssueRequest, db=Depends(get_db), current_us
         "student_name": student["full_name"],
         "book_id": str(book["_id"]),
         "book_title": book["title"],
-        "issue_date": datetime.utcnow(),
-        "due_date": datetime.utcnow() + timedelta(days=borrow_days),
+        "issue_date": datetime.now(timezone.utc).replace(tzinfo=None),
+        "due_date": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=borrow_days),
         "return_date": None,
         "status": "issued",
         "renew_count": 0
@@ -251,7 +251,7 @@ async def return_book(request: BorrowReturnRequest, db=Depends(get_db), current_
             detail="Book not found"
         )
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     borrow = db.borrows.find_one_and_update(
         {
             "student_id": request.student_id,
@@ -417,7 +417,7 @@ async def renew_book(request: BorrowIssueRequest, db=Depends(get_db), current_us
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Maximum renewal limit ({max_renewals}) reached.")
     
     # Check if book is overdue — don't allow renewal if overdue
-    if borrow["due_date"] < datetime.utcnow():
+    if borrow["due_date"] < datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot renew an overdue book. Please return it first.")
     
     # Check for conflicting reservations
@@ -462,7 +462,7 @@ async def get_transactions(
 
     if overdue:
         search_filter["status"] = "issued"
-        search_filter["due_date"] = {"$lt": datetime.utcnow()}
+        search_filter["due_date"] = {"$lt": datetime.now(timezone.utc).replace(tzinfo=None)}
 
     if query and query.strip():
         q = query.strip()
@@ -515,7 +515,7 @@ async def bulk_return_books(
     if not borrows:
         return {"message": "Successfully processed returns for 0 transaction(s)"}
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     valid_tx_ids = [b["_id"] for b in borrows]
     
     # Mark them returned in bulk
@@ -618,7 +618,7 @@ async def get_reports_stats(db=Depends(get_db), current_user=Depends(has_permiss
         {"$facet": {
             "issued": [{"$match": {"status": "issued"}}, {"$count": "n"}],
             "returned": [{"$match": {"status": "returned"}}, {"$count": "n"}],
-            "overdue": [{"$match": {"status": "issued", "due_date": {"$lt": datetime.utcnow()}}}, {"$count": "n"}]
+            "overdue": [{"$match": {"status": "issued", "due_date": {"$lt": datetime.now(timezone.utc).replace(tzinfo=None)}}}, {"$count": "n"}]
         }}
     ]
     result = list(db.borrows.aggregate(pipeline))

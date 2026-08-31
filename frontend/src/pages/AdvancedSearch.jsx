@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { searchBooksAdvanced, searchStudentsAdvanced, getGenres } from '../services/api';
 import './books.css';
@@ -177,7 +177,9 @@ const AdvancedSearch = () => {
   useEffect(() => {
     const stored = localStorage.getItem('user');
     if (stored) {
-      try { setIsAdmin(JSON.parse(stored).role === 'admin'); } catch (_) {}
+      try { setIsAdmin(JSON.parse(stored).role === 'admin'); } catch (err) {
+        console.error("Failed to parse user role.", err);
+      }
     }
   }, []);
 
@@ -236,7 +238,7 @@ const AdvancedSearch = () => {
     const params = {};
     if (query) params.q = query;
     setSearchParams(params, { replace: true });
-  }, [query]);
+  }, [query, setSearchParams]);
 
   // ── Execute search ──────────────────────────────────────────
   const doSearch = useCallback(async () => {
@@ -283,6 +285,7 @@ const AdvancedSearch = () => {
         setStuResult(null);
       }
     } catch (e) {
+      console.error(e);
       setError('Search failed. Please check your connection and try again.');
     } finally {
       setLoading(false);

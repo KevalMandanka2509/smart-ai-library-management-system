@@ -126,7 +126,7 @@ async def update_system_settings(
     if not update_data:
         return {"message": "No allowed settings provided for update"}
 
-    update_data["updated_at"] = datetime.utcnow()
+    update_data["updated_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
     update_data["updated_by"] = current_user.get("username", "system")
 
     db.settings.update_one(
@@ -187,7 +187,7 @@ async def export_database_backup(
 
     backup_data = {
         "version": "1.0",
-        "exported_at": datetime.utcnow().isoformat(),
+        "exported_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "exported_by": current_admin.get("username", "admin"),
         "books": list(db.books.find({}, {"_id": 0})),
         "students": list(db.students.find({}, {"_id": 0})),
@@ -202,7 +202,7 @@ async def export_database_backup(
     json_str = json.dumps(backup_data, indent=2, default=str)
     buffer = io.BytesIO(json_str.encode("utf-8"))
 
-    filename = f"smart_library_backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+    filename = f"smart_library_backup_{datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y%m%d_%H%M%S')}.json"
     return StreamingResponse(
         buffer,
         media_type="application/json",

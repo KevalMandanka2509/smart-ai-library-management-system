@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import base64
 from bson import ObjectId
 
@@ -91,7 +91,7 @@ def log_audit(db, user: dict, action: str, resource: str, details: str = ""):
         "action": action,
         "resource": resource,
         "details": details,
-        "timestamp": datetime.utcnow()
+        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None)
     })
 
 # ─────────────────────────────────────────────
@@ -149,7 +149,7 @@ async def get_my_profile(db=Depends(get_db), current_user=Depends(get_current_us
             "id": str(s.get("_id")),
             "device": s.get("device", "Web Browser"),
             "ip": s.get("ip", "Unknown"),
-            "last_active": s.get("last_active", datetime.utcnow()).isoformat() if isinstance(s.get("last_active"), datetime) else str(s.get("last_active", "Active now")),
+            "last_active": s.get("last_active", datetime.now(timezone.utc).replace(tzinfo=None)).isoformat() if isinstance(s.get("last_active"), datetime) else str(s.get("last_active", "Active now")),
             "is_current": False
         })
     if not sessions:
@@ -288,7 +288,7 @@ async def get_all_users_admin(
             "full_name": u.get("full_name"),
             "role": role,
             "permissions": u.get("permissions", ROLE_DEFAULT_PERMISSIONS.get(role, [])),
-            "is_active": not bool(u.get("locked_until") and u["locked_until"] > datetime.utcnow()),
+            "is_active": not bool(u.get("locked_until") and u["locked_until"] > datetime.now(timezone.utc).replace(tzinfo=None)),
             "last_login": u.get("last_login").isoformat() if isinstance(u.get("last_login"), datetime) else None,
             "created_at": u.get("created_at").isoformat() if isinstance(u.get("created_at"), datetime) else None
         })
@@ -322,7 +322,7 @@ async def create_user_admin(
         "role": payload.role,
         "permissions": perms,
         "login_attempts": 0,
-        "created_at": datetime.utcnow()
+        "created_at": datetime.now(timezone.utc).replace(tzinfo=None)
     }
     res = db.users.insert_one(doc)
 
@@ -428,7 +428,7 @@ async def delete_user_admin(
     db.recycle_bin.insert_one({
         "original_collection": "users",
         "record": user,
-        "deleted_at": datetime.utcnow(),
+        "deleted_at": datetime.now(timezone.utc).replace(tzinfo=None),
         "deleted_by": current_user.get("username", "admin"),
         "display_name": user.get("username", "Unknown User")
     })
@@ -441,7 +441,7 @@ async def delete_user_admin(
         db.recycle_bin.insert_one({
             "original_collection": "students",
             "record": student,
-            "deleted_at": datetime.utcnow(),
+            "deleted_at": datetime.now(timezone.utc).replace(tzinfo=None),
             "deleted_by": current_user.get("username", "admin"),
             "display_name": student.get("full_name", user.get("username"))
         })

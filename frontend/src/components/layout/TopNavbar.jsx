@@ -43,7 +43,9 @@ const TopNavbar = ({ userRole, onLogout }) => {
           setUnreadCount(data.filter(n => !n.read).length);
           setLatestNotifs(data.slice(0, 5));
         }
-      } catch (_) { }
+      } catch (_) { 
+        console.error("Failed to fetch notifications.");
+      }
     };
     fetchNotifs();
     const interval = setInterval(fetchNotifs, 120000);
@@ -56,7 +58,9 @@ const TopNavbar = ({ userRole, onLogout }) => {
       await markNotificationRead(id);
       setLatestNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
       setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (_) { }
+    } catch (_) { 
+      console.error("Failed to mark notification as read.");
+    }
   };
 
   const handleMarkAllRead = async (e) => {
@@ -65,7 +69,9 @@ const TopNavbar = ({ userRole, onLogout }) => {
       await markAllNotificationsRead();
       setLatestNotifs(prev => prev.map(n => ({ ...n, read: true })));
       setUnreadCount(0);
-    } catch (_) { }
+    } catch (_) { 
+      console.error("Failed to mark all notifications as read.");
+    }
   };
 
   const handleLogout = () => {

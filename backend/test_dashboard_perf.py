@@ -1,11 +1,11 @@
 import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.database import db
 
 async def test_dashboard():
     database = db.get_db()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     start_30 = now - timedelta(days=30)
     start_7 = now - timedelta(days=7)
     start_90 = now - timedelta(days=90)

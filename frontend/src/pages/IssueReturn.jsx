@@ -91,6 +91,7 @@ const IssueReturn = () => {
       setScannedCode(decodedText);
       processTransaction(decodedText);
     } catch (err) {
+      console.error(err);
       setError("Could not find a valid QR or Barcode in the uploaded image.");
     } finally {
       setIsLoading(false);

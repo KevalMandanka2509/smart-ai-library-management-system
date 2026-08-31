@@ -97,10 +97,6 @@ const Books = () => {
     };
   }, [showForm]);
 
-  useEffect(() => {
-    loadBooksData();
-  }, [searchTerm, selectedGenre, availabilityFilter, sortBy, sortOrder, currentPage]);
-
   const loadGenresList = async () => {
     try {
       const distinctGenres = await getGenres();
@@ -110,7 +106,7 @@ const Books = () => {
     }
   };
 
-  const loadBooksData = async () => {
+  const loadBooksData = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -131,7 +127,12 @@ const Books = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, selectedGenre, availabilityFilter, sortBy, sortOrder, currentPage, pageSize]);
+
+  useEffect(() => {
+    loadBooksData();
+  }, [loadBooksData]);
+
 
   const handleDelete = async (id, title) => {
     if (!window.confirm(`Are you sure you want to delete "${title}"?`)) return;
@@ -141,6 +142,7 @@ const Books = () => {
       loadBooksData();
       loadGenresList();
     } catch (err) {
+      console.error(err);
       setError('Failed to delete book');
     }
   };
@@ -154,6 +156,7 @@ const Books = () => {
       loadBooksData();
       loadGenresList();
     } catch (err) {
+      console.error(err);
       setError('Bulk delete failed');
     }
   };

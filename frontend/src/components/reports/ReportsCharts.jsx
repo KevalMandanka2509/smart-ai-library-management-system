@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
 import { SectionCard, EmptyState, COLORS } from './ReportsCore';
 import api from '../../services/api';
@@ -179,7 +179,7 @@ export const CategorySection = ({ globalPeriod }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
@@ -190,7 +190,7 @@ export const CategorySection = ({ globalPeriod }) => {
       setError(true);
     }
     setLoading(false);
-  };
+  }, [globalPeriod]);
 
   useEffect(() => {
     loadData();
@@ -341,12 +341,39 @@ export const CategorySection = ({ globalPeriod }) => {
   );
 };
 
+const Table = ({ data, columns, emptyMessage }) => (
+  <div style={{ overflowX: 'auto', border: '1px solid #f1f5f9', borderRadius: '8px', background: 'white' }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+      <thead>
+        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
+          {columns.map((c, i) => <th key={i} style={{ padding: '0.75rem 1rem', color: '#64748b', fontWeight: 600 }}>{c.header}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {data.length === 0 ? (
+          <tr><td colSpan={columns.length} style={{ padding: '1rem', textAlign: 'center', color: '#94a3b8' }}>{emptyMessage}</td></tr>
+        ) : (
+          data.map((row, i) => (
+            <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+              {columns.map((c, j) => <td key={j} style={{ padding: '0.75rem 1rem', color: '#334155' }}>{c.render(row)}</td>)}
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
+  </div>
+);
+
+const TruncatedText = ({ text }) => (
+  <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }} title={text}>{text}</div>
+);
+
 export const FineAnalytics = ({ globalPeriod }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
@@ -357,7 +384,7 @@ export const FineAnalytics = ({ globalPeriod }) => {
       setError(true);
     }
     setLoading(false);
-  };
+  }, [globalPeriod]);
 
   useEffect(() => {
     loadData();
@@ -488,7 +515,7 @@ export const BorrowingBehaviourHeatmap = ({ globalPeriod }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
@@ -499,7 +526,7 @@ export const BorrowingBehaviourHeatmap = ({ globalPeriod }) => {
       setError(true);
     }
     setLoading(false);
-  };
+  }, [globalPeriod]);
 
   useEffect(() => {
     loadData();
@@ -527,7 +554,7 @@ export const BorrowingBehaviourHeatmap = ({ globalPeriod }) => {
     );
   }
 
-  const { peakDays, peakHours, returnBehaviour, averageDuration, heatmap } = data;
+  const { heatmap } = data;
 
   // Heatmap rendering logic
   const renderHeatmap = () => {

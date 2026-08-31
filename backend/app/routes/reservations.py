@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from datetime import datetime
+from datetime import datetime, timezone
 from bson import ObjectId
 from typing import List
 
@@ -102,7 +102,7 @@ async def reserve_book(request: ReservationRequest, db=Depends(get_db), current_
                 "student_name": student["full_name"],
                 "book_id": str(book["_id"]),
                 "book_title": book["title"],
-                "reserved_at": datetime.utcnow(),
+                "reserved_at": datetime.now(timezone.utc).replace(tzinfo=None),
                 "status": "pending"
             }
         },
@@ -149,7 +149,7 @@ async def expire_stale_reservations_internal(db):
     from datetime import timedelta
     lib_settings = get_library_settings(db)
     max_days = lib_settings["max_reservation_days"]
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     cutoff_time = now - timedelta(days=max_days)
     
     stale_res = list(db.reservations.find({
@@ -236,7 +236,7 @@ async def cancel_reservation(id: str, db=Depends(get_db), current_user=Depends(g
         # Check for next pending reservation atomically
         next_res = db.reservations.find_one_and_update(
             {"book_id": book_id, "status": "pending"},
-            {"$set": {"status": "ready", "ready_at": datetime.utcnow()}},
+            {"$set": {"status": "ready", "ready_at": datetime.now(timezone.utc).replace(tzinfo=None)}},
             sort=[("reserved_at", 1)]
         )
         

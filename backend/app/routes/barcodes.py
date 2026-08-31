@@ -1,6 +1,6 @@
 import io
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -185,7 +185,7 @@ async def bulk_generate(
             {"$set": {
                 "barcode_value": barcode_val,
                 "qr_value": qr_val,
-                "updated_at": datetime.utcnow()
+                "updated_at": datetime.now(timezone.utc).replace(tzinfo=None)
             }}
         )
         updated_count += 1

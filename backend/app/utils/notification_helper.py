@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 logger = logging.getLogger("app.notifications")
@@ -45,7 +45,7 @@ async def create_notification(db, student_id: str, title: str, message: str, n_t
             "title": title,
             "message": message,
             "type": n_type,
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc).replace(tzinfo=None),
             "read": False
         }
         db.notifications.insert_one(notif)

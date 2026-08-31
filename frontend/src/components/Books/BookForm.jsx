@@ -91,7 +91,9 @@ const BookForm = ({ book, onSave, onCancel }) => {
       } else {
         setCodeWarning('');
       }
-    } catch (_) {}
+    } catch (_) {
+      console.error("Barcode validation failed.");
+    }
   };
 
   const handleValidateQr = async () => {
@@ -103,7 +105,9 @@ const BookForm = ({ book, onSave, onCancel }) => {
       } else {
         setCodeWarning('');
       }
-    } catch (_) {}
+    } catch (_) {
+      console.error("QR validation failed.");
+    }
   };
 
   const handleFileChange = (file) => {

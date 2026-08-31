@@ -9,7 +9,7 @@ import uuid
 import asyncio
 import logging
 import base64
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 
 logger = logging.getLogger(__name__)
@@ -38,9 +38,9 @@ def get_db_fallback_response(message: str, db_client, role: str, username: str, 
     return process_chat_query(message, db_client, role, username, contents)
 
 def stream_gemini_api_sync(contents: list, system_instruction: str = None, session_id: str = None, user_id: str = None, user_text: str = None, pymongo_db=None, role: str = None, username: str = None):
-    api_key = settings.GEMINI_API_KEY
-    # Google Gemini keys must start with 'AIza'
-    is_invalid_key = not api_key or api_key == "<YOUR_GEMINI_API_KEY>" or not api_key.startswith("AIza")
+    from app.services.gemini_key_manager import GeminiKeyManager
+    api_key = GeminiKeyManager().get_available_key()
+    is_invalid_key = not api_key
     if is_invalid_key:
         if pymongo_db is not None and role and username and user_text:
             mock_msg = get_db_fallback_response(user_text, pymongo_db, role, username, contents)
@@ -58,12 +58,12 @@ def stream_gemini_api_sync(contents: list, system_instruction: str = None, sessi
                     db_client.ai_chat_sessions.update_one(
                         {"session_id": session_id},
                         {
-                            "$set": {"user_id": str(user_id), "updated_at": datetime.utcnow()},
+                            "$set": {"user_id": str(user_id), "updated_at": datetime.now(timezone.utc).replace(tzinfo=None)},
                             "$push": {
                                 "messages": {
                                     "$each": [
-                                        {"role": "user", "text": user_text, "timestamp": datetime.utcnow()},
-                                        {"role": "model", "text": full_response, "timestamp": datetime.utcnow()}
+                                        {"role": "user", "text": user_text, "timestamp": datetime.now(timezone.utc).replace(tzinfo=None)},
+                                        {"role": "model", "text": full_response, "timestamp": datetime.now(timezone.utc).replace(tzinfo=None)}
                                     ]
                                 }
                             }
@@ -145,12 +145,12 @@ def stream_gemini_api_sync(contents: list, system_instruction: str = None, sessi
                     db_client.ai_chat_sessions.update_one(
                         {"session_id": session_id},
                         {
-                            "$set": {"user_id": str(user_id), "updated_at": datetime.utcnow()},
+                            "$set": {"user_id": str(user_id), "updated_at": datetime.now(timezone.utc).replace(tzinfo=None)},
                             "$push": {
                                 "messages": {
                                     "$each": [
-                                        {"role": "user", "text": user_text, "timestamp": datetime.utcnow()},
-                                        {"role": "model", "text": full_response, "timestamp": datetime.utcnow()}
+                                        {"role": "user", "text": user_text, "timestamp": datetime.now(timezone.utc).replace(tzinfo=None)},
+                                        {"role": "model", "text": full_response, "timestamp": datetime.now(timezone.utc).replace(tzinfo=None)}
                                     ]
                                 }
                             }
@@ -213,12 +213,12 @@ async def chat_with_ai(
                             db_client.ai_chat_sessions.update_one(
                                 {"session_id": session_id or str(uuid.uuid4())},
                                 {
-                                    "$set": {"user_id": str(current_user.get('_id')), "updated_at": datetime.utcnow()},
+                                    "$set": {"user_id": str(current_user.get('_id')), "updated_at": datetime.now(timezone.utc).replace(tzinfo=None)},
                                     "$push": {
                                         "messages": {
                                             "$each": [
-                                                {"role": "user", "text": message, "timestamp": datetime.utcnow()},
-                                                {"role": "model", "text": full_response, "timestamp": datetime.utcnow()}
+                                                {"role": "user", "text": message, "timestamp": datetime.now(timezone.utc).replace(tzinfo=None)},
+                                                {"role": "model", "text": full_response, "timestamp": datetime.now(timezone.utc).replace(tzinfo=None)}
                                             ]
                                         }
                                     }
@@ -259,12 +259,12 @@ async def chat_with_ai(
                 pymongo_db.ai_chat_sessions.update_one(
                     {"session_id": sess_id},
                     {
-                        "$set": {"user_id": str(user_id), "updated_at": datetime.utcnow()},
+                        "$set": {"user_id": str(user_id), "updated_at": datetime.now(timezone.utc).replace(tzinfo=None)},
                         "$push": {
                             "messages": {
                                 "$each": [
-                                    {"role": "user", "text": message, "timestamp": datetime.utcnow()},
-                                    {"role": "model", "text": final_response, "timestamp": datetime.utcnow()}
+                                    {"role": "user", "text": message, "timestamp": datetime.now(timezone.utc).replace(tzinfo=None)},
+                                    {"role": "model", "text": final_response, "timestamp": datetime.now(timezone.utc).replace(tzinfo=None)}
                                 ]
                             }
                         }
@@ -322,7 +322,8 @@ async def get_chat_sessions(current_user: dict = Depends(get_current_user)):
 
 @router.get("/status")
 async def get_ai_status():
-    api_key = settings.GEMINI_API_KEY
-    if not api_key or api_key == "<YOUR_GEMINI_API_KEY>" or not api_key.startswith("AIza"):
+    from app.services.gemini_key_manager import GeminiKeyManager
+    api_key = GeminiKeyManager().get_available_key()
+    if not api_key:
         return {"status": "db_mode"}
     return {"status": "online"}

@@ -5,7 +5,7 @@ Uses the same sync pymongo driver and bcrypt hashing as the running application.
 from pymongo import MongoClient
 from app.config import settings
 from app.core.security import security
-from datetime import datetime
+from datetime import datetime, timezone
 
 def create_admin():
     client = MongoClient(settings.MONGODB_URL)
@@ -98,8 +98,8 @@ def create_admin():
         "login_attempts": 0,
         "locked_until": None,
         "last_login": None,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc).replace(tzinfo=None),
+        "updated_at": datetime.now(timezone.utc).replace(tzinfo=None),
     }
 
     collection.insert_one(admin_data)

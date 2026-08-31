@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..database import get_db
 from ..core.security import get_current_admin
@@ -119,7 +119,7 @@ async def export_audit_logs_csv(
         ])
 
     output.seek(0)
-    filename = f"audit_logs_export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    filename = f"audit_logs_export_{datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y%m%d_%H%M%S')}.csv"
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",

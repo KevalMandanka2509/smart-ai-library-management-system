@@ -2,7 +2,7 @@ import pytest
 import asyncio
 from pymongo import MongoClient
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 
 mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
@@ -45,8 +45,8 @@ async def test_scheduler_multi_worker_lock():
         {"job_id": "test_job_2"},
         {"$set": {
             "owner_id": "crashed_worker",
-            "acquired_at": datetime.utcnow() - timedelta(minutes=10),
-            "expires_at": datetime.utcnow() - timedelta(minutes=5)
+            "acquired_at": datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10),
+            "expires_at": datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=5)
         }},
         upsert=True
     )

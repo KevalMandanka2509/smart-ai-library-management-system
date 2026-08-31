@@ -1,3 +1,4 @@
+from datetime import timezone
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -52,9 +53,9 @@ def test_otp_verification_limits():
         "email": "verify@test.com",
         "type": "otp",
         "otp_hash": security.hash_password("123456"),
-        "expires_at": datetime.utcnow() + timedelta(minutes=10),
+        "expires_at": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=10),
         "attempts": 0,
-        "cooldown_until": datetime.utcnow() - timedelta(minutes=1)
+        "cooldown_until": datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=1)
     })
     
     # Attempt 1 - fail

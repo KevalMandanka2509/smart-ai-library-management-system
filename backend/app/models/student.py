@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 def student_document(data: dict) -> dict:
     """Create MongoDB document from student data"""
@@ -18,8 +18,8 @@ def student_document(data: dict) -> dict:
         "is_active": data.get("is_active", True),
         "books_borrowed": data.get("books_borrowed", 0),
         "total_fines": data.get("total_fines", 0.0),
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(timezone.utc).replace(tzinfo=None),
+        "updated_at": datetime.now(timezone.utc).replace(tzinfo=None)
     }
 
 def serialize_student(student: dict) -> dict:
@@ -32,8 +32,8 @@ def serialize_student(student: dict) -> dict:
         student.setdefault("books_borrowed", 0)
         student.setdefault("total_fines", 0.0)
         student.setdefault("is_active", True)
-        student.setdefault("created_at", datetime.utcnow())
-        student.setdefault("updated_at", datetime.utcnow())
+        student.setdefault("created_at", datetime.now(timezone.utc).replace(tzinfo=None))
+        student.setdefault("updated_at", datetime.now(timezone.utc).replace(tzinfo=None))
         
     return student
 

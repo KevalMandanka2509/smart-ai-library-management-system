@@ -1,5 +1,5 @@
 import React from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, PieChart, Pie } from 'recharts';
 
 export const COLORS = ['#D4A017', '#1e293b', '#16a34a', '#ea580c', '#dc2626', '#3b82f6', '#64748b', '#fcd34d'];
 

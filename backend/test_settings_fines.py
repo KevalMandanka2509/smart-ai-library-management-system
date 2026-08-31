@@ -3,7 +3,7 @@ import httpx
 from pymongo import MongoClient
 from app.config import settings
 from app.core.security import security
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from bson import ObjectId
 
 base_url = "http://localhost:8000"
@@ -103,7 +103,7 @@ async def main():
         
         # TEST 4: Fine lifecycle (overdue + max fine cap)
         # Manually alter the borrow record in DB to be overdue by 10 days
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         due_date = now - timedelta(days=10)
         db.borrows.update_one({"student_id": "testmember999", "book_id": book_ids[0]}, {"$set": {"due_date": due_date}})
         

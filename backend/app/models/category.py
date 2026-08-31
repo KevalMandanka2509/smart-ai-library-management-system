@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def category_document(data: dict) -> dict:
@@ -8,8 +8,8 @@ def category_document(data: dict) -> dict:
         "description": data.get("description", ""),
         "status": data.get("status", "active"),
         "is_deleted": False,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(timezone.utc).replace(tzinfo=None),
+        "updated_at": datetime.now(timezone.utc).replace(tzinfo=None)
     }
 
 
@@ -19,8 +19,8 @@ def serialize_category(category: dict) -> dict:
         if "_id" in category:
             category["id"] = str(category["_id"])
             del category["_id"]
-        category.setdefault("created_at", datetime.utcnow())
-        category.setdefault("updated_at", datetime.utcnow())
+        category.setdefault("created_at", datetime.now(timezone.utc).replace(tzinfo=None))
+        category.setdefault("updated_at", datetime.now(timezone.utc).replace(tzinfo=None))
     return category
 
 

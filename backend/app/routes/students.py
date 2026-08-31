@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, Response
 from bson import ObjectId
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..database import get_db
 from ..models.student import student_document, serialize_student, serialize_students
@@ -209,7 +209,7 @@ async def bulk_delete_students(
             {
                 "original_collection": "students",
                 "record": rec,
-                "deleted_at": datetime.utcnow(),
+                "deleted_at": datetime.now(timezone.utc).replace(tzinfo=None),
                 "deleted_by": current_user.get("username", "admin") if current_user else "admin",
                 "display_name": rec.get("name", rec.get("full_name", rec.get("title", "Deleted Record")))
             } for rec in records_to_delete
@@ -488,7 +488,7 @@ async def update_student(
         db.users.update_one({"username": old_student_id}, {"$set": {"username": new_student_id}})
     
     # Add updated_at timestamp
-    update_data["updated_at"] = datetime.utcnow()
+    update_data["updated_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
     
     from pymongo import ReturnDocument
     from pymongo.errors import DuplicateKeyError
@@ -571,7 +571,7 @@ async def delete_student(
         db.recycle_bin.insert_one({
             "original_collection": "students", 
             "record": record_to_delete, 
-            "deleted_at": datetime.utcnow(), 
+            "deleted_at": datetime.now(timezone.utc).replace(tzinfo=None), 
             "deleted_by": current_user.get("username", "admin") if current_user else "admin", 
             "display_name": record_to_delete.get("name", record_to_delete.get("full_name", record_to_delete.get("title", "Deleted Record")))
         })

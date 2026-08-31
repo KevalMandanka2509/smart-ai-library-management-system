@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from datetime import datetime
+from datetime import datetime, timezone
 from ..database import get_db
 from ..models.user_model import user_document, serialize_user
 from ..core.security import security
@@ -96,7 +96,7 @@ async def login(request: LoginRequest, db=Depends(get_db)):
     
     # Check if account is locked
     if user.get("locked_until"):
-        if user["locked_until"] > datetime.utcnow():
+        if user["locked_until"] > datetime.now(timezone.utc).replace(tzinfo=None):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account is temporarily locked"
@@ -119,7 +119,7 @@ async def login(request: LoginRequest, db=Depends(get_db)):
         # Lock if max attempts exceeded
         from datetime import timedelta
         if attempts >= 5:
-            update_data["locked_until"] = datetime.utcnow() + timedelta(minutes=15)
+            update_data["locked_until"] = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=15)
         
         collection.update_one({"_id": user["_id"]}, {"$set": update_data})
         
@@ -134,7 +134,7 @@ async def login(request: LoginRequest, db=Depends(get_db)):
         {"$set": {
             "login_attempts": 0,
             "locked_until": None,
-            "last_login": datetime.utcnow()
+            "last_login": datetime.now(timezone.utc).replace(tzinfo=None)
         }}
     )
 
@@ -191,7 +191,7 @@ async def refresh_token(request: RefreshTokenRequest, db=Depends(get_db)):
                 detail="Account is inactive or disabled"
             )
             
-        if user.get("locked_until") and user["locked_until"] > datetime.utcnow():
+        if user.get("locked_until") and user["locked_until"] > datetime.now(timezone.utc).replace(tzinfo=None):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account is temporarily locked"
@@ -227,7 +227,7 @@ async def forgot_password(request: ForgotPasswordRequest, db=Depends(get_db)):
     if not user:
         return success_message
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     
     # Check rate limits
     existing_limit = rate_limits.find_one({"email": request.email.lower(), "type": "otp"})
@@ -298,7 +298,7 @@ async def verify_otp(request: VerifyOTPRequest, db=Depends(get_db)):
     from datetime import datetime, timedelta
     import secrets
     rate_limits = db.auth_rate_limits
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     
     limit_doc = rate_limits.find_one({"email": request.email.lower(), "type": "otp"})
     
@@ -361,7 +361,7 @@ async def reset_password(request: ResetPasswordRequest, db=Depends(get_db)):
     from datetime import datetime
     collection = db.users
     rate_limits = db.auth_rate_limits
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     
     limit_doc = rate_limits.find_one({"email": request.email.lower(), "type": "reset_token"})
     
@@ -416,4 +416,4 @@ async def reset_password(request: ResetPasswordRequest, db=Depends(get_db)):
     
     return {
         "message": "Password has been reset successfully"
-    }
+    }

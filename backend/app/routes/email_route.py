@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..database import get_db
 from ..core.security import get_current_admin
@@ -52,7 +52,7 @@ async def update_smtp_settings(
 
     db.system_settings.update_one(
         {"key": "smtp_config"},
-        {"$set": {"key": "smtp_config", "value": data, "updated_at": datetime.utcnow()}},
+        {"$set": {"key": "smtp_config", "value": data, "updated_at": datetime.now(timezone.utc).replace(tzinfo=None)}},
         upsert=True
     )
     return {"message": "SMTP settings saved successfully"}
@@ -87,7 +87,7 @@ async def trigger_due_reminders(
     current_admin=Depends(get_current_admin)
 ):
     """Scan all active borrows and send due/overdue email reminders."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     active_borrows = list(db.borrows.find({"status": "issued"}))
 
     student_ids = list({b.get("student_id") for b in active_borrows if b.get("student_id")})

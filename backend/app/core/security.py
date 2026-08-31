@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict
 import bcrypt
 import jwt
@@ -34,7 +34,7 @@ class Security:
     ) -> str:
         """Create JWT access token"""
         to_encode = data.copy()
-        expire = datetime.utcnow() + (
+        expire = datetime.now(timezone.utc).replace(tzinfo=None) + (
             expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         )
         to_encode.update({"exp": expire, "type": "access"})
@@ -44,7 +44,7 @@ class Security:
     def create_refresh_token(data: Dict) -> str:
         """Create JWT refresh token"""
         to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        expire = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         to_encode.update({"exp": expire, "type": "refresh"})
         return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -105,7 +105,7 @@ class Security:
     def audit_log(action: str, status_msg: str, user_identifier: str, client_ip: str):
         """Standardized security activity logger"""
         audit_logger.info(
-            f"[AUDIT LOG] Timestamp: {datetime.utcnow().isoformat()} | "
+            f"[AUDIT LOG] Timestamp: {datetime.now(timezone.utc).replace(tzinfo=None).isoformat()} | "
             f"Action: {action} | Status: {status_msg} | User: {user_identifier} | IP: {client_ip}"
         )
 
@@ -172,7 +172,7 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
             detail="Account is inactive or disabled"
         )
         
-    if user.get("locked_until") and user["locked_until"] > datetime.utcnow():
+    if user.get("locked_until") and user["locked_until"] > datetime.now(timezone.utc).replace(tzinfo=None):
         Security.audit_log("USER_AUTHENTICATION", "ACCOUNT_LOCKED", str(user_id), client_ip)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

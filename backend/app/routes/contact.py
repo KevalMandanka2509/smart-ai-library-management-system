@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from bson import ObjectId
 from ..database import get_db
 from ..core.security import get_current_user
@@ -31,7 +31,7 @@ class ContactResponse(BaseModel):
 def submit_contact_message(message: ContactCreate, db = Depends(get_db)):
     doc = message.model_dump()
     doc["is_read"] = False
-    doc["created_at"] = datetime.utcnow()
+    doc["created_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
     
     result = db.contact_messages.insert_one(doc)
     doc["id"] = str(result.inserted_id)

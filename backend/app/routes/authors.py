@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from bson import ObjectId
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 import logging
 
@@ -206,7 +206,7 @@ async def update_author(
         )
 
     # Add updated_at timestamp
-    update_data["updated_at"] = datetime.utcnow()
+    update_data["updated_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # Update in MongoDB
     result = collection.update_one(
@@ -275,7 +275,7 @@ async def delete_author(
     db.recycle_bin.insert_one({
         "original_collection": "authors",
         "record": author,
-        "deleted_at": datetime.utcnow(),
+        "deleted_at": datetime.now(timezone.utc).replace(tzinfo=None),
         "deleted_by": current_user.get("username", "admin"),
         "display_name": author.get("name", "Unknown Author")
     })

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from ..core.security import security
 
 def user_document(data: dict) -> dict:
@@ -13,8 +13,8 @@ def user_document(data: dict) -> dict:
         "login_attempts": 0,
         "locked_until": None,
         "last_login": None,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(timezone.utc).replace(tzinfo=None),
+        "updated_at": datetime.now(timezone.utc).replace(tzinfo=None)
     }
 
 def serialize_user(user: dict) -> dict:

@@ -3,7 +3,7 @@ import asyncio
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 from ..config import settings
@@ -45,7 +45,7 @@ def _base_email_template(title: str, content_html: str) -> str:
           {content_html}
         </div>
         <div class="footer">
-          <p>© {datetime.utcnow().year} Smart AI Library Management System. All rights reserved.</p>
+          <p>© {datetime.now(timezone.utc).replace(tzinfo=None).year} Smart AI Library Management System. All rights reserved.</p>
           <p>This is an automated notification. Please do not reply directly to this email.</p>
         </div>
       </div>
@@ -146,7 +146,7 @@ def build_test_email_html(recipient_email: str) -> str:
       
       <div class="info-card" style="border-left-color: #16a34a;">
         <div class="info-row"><span class="info-label">Target Recipient:</span> <span class="info-val">{recipient_email}</span></div>
-        <div class="info-row"><span class="info-label">Dispatched At:</span> <span class="info-val">{datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")}</span></div>
+        <div class="info-row"><span class="info-label">Dispatched At:</span> <span class="info-val">{datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S UTC")}</span></div>
         <div class="info-row"><span class="info-label">Status:</span> <span class="info-val" style="color: #16a34a;">Operational</span></div>
       </div>
     """
@@ -293,7 +293,7 @@ class EmailService:
                     "template_name": template_name,
                     "template_args": template_args or {},
                     "status": status_str,
-                    "dispatched_at": datetime.utcnow()
+                    "dispatched_at": datetime.now(timezone.utc).replace(tzinfo=None)
                 }
                 db.email_logs.insert_one(log_entry)
             except Exception as e:

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from ..database import get_db
 from ..core.security import get_current_admin, get_current_user
@@ -88,7 +88,7 @@ def _build_date_expr(field: str, start: datetime, end: datetime) -> dict:
     }
 
 def _get_date_range(period: str, date_from: Optional[str] = None, date_to: Optional[str] = None) -> tuple[datetime, datetime]:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     
     if date_from and date_to:
         try:
@@ -143,6 +143,29 @@ def _build_match_query(start: datetime, end: datetime, date_field: str = "create
 # ---------------------------------------------------------
 # 1. Overview KPIs
 # ---------------------------------------------------------
+@router.get("/filter-options")
+async def get_filter_options(db=Depends(get_db), current_user=Depends(has_permission("reports:view"))):
+    categories = sorted([c for c in db.books.distinct("genre") if c])
+    authors = sorted([a for a in db.books.distinct("author") if a])
+    books = sorted([b for b in db.books.distinct("title") if b])
+    
+    # We will use member_id for student filtering, but UI needs names.
+    # To keep it simple and match the generic filter layout, we'll return a list of dicts or just distinct member names
+    # Wait, the simplest is distinct student_id for value, but let's just return distinct student_name from borrows to match whatever was used,
+    # or just return student objects. Actually let's return distinct names for now, we can match by name or id later.
+    # The `_build_match_query` expects `member_id`, but we can let it accept name or ID.
+    # Let's get list of students (id and name)
+    students = list(db.students.find({"is_active": True}, {"name": 1, "student_id": 1}))
+    members = [{"id": str(s.get("student_id", s.get("_id"))), "name": s.get("name", "Unknown")} for s in students]
+
+    return {
+        "categories": categories,
+        "authors": authors,
+        "books": books,
+        "members": members,
+        "statuses": ["issued", "returned"]
+    }
+
 @router.get("/overview")
 async def get_overview(
     period: str = Query("last_30_days"), date_from: Optional[str] = None, date_to: Optional[str] = None,
@@ -162,7 +185,7 @@ async def get_overview(
     curr_returns = db.borrows.count_documents(_build_match_query(start, end, "return_date", member_id=member))
     prev_returns = db.borrows.count_documents(_build_match_query(prev_start, start, "return_date", member_id=member))
     
-    overdue_match = {"status": "issued", "due_date": {"$lt": datetime.utcnow()}}
+    overdue_match = {"status": "issued", "due_date": {"$lt": datetime.now(timezone.utc).replace(tzinfo=None)}}
     if member and member != 'all': overdue_match["student_id"] = member
     curr_overdue = db.borrows.count_documents(overdue_match)
     
@@ -226,7 +249,7 @@ async def get_circulation(
     
     return_agg = list(db.borrows.aggregate(_date_agg_pipeline("return_date", start, end, date_fmt)))
     
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     # For overdue, due_date must be before now, so end time is min(end, now)
     overdue_end = end if end < now else now
     overdue_agg = list(db.borrows.aggregate(_date_agg_pipeline("due_date", start, overdue_end, date_fmt, {"status": "issued"})))
@@ -293,7 +316,7 @@ async def get_books_analytics(period: str = Query("last_30_days"), db=Depends(ge
     most_borrowed = list(db.borrows.aggregate(most_borrowed_pipeline))
     
     # Most Overdue
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     # Group overdue books by book_id to get overdueCount and min due_date (max days overdue)
     overdue_pipeline = [
         {"$match": {"status": "issued"}},
@@ -432,7 +455,7 @@ async def get_categories(period: str = Query("last_30_days"), db=Depends(get_db)
             "_id": "$category", 
             "issues": {"$sum": 1},
             "returns": {"$sum": {"$cond": [{"$eq": ["$status", "returned"]}, 1, 0]}},
-            "overdue": {"$sum": {"$cond": [{"$and": [{"$eq": ["$status", "issued"]}, {"$lt": ["$__norm_due_date", datetime.utcnow()]}]}, 1, 0]}}
+            "overdue": {"$sum": {"$cond": [{"$and": [{"$eq": ["$status", "issued"]}, {"$lt": ["$__norm_due_date", datetime.now(timezone.utc).replace(tzinfo=None)]}]}, 1, 0]}}
         }},
         {"$sort": {"issues": -1}}
     ]
@@ -577,7 +600,7 @@ async def get_members_analytics(period: str = Query("last_30_days"), db=Depends(
             "name": {"$first": "$student_name"},
             "issues": {"$sum": 1},
             "returns": {"$sum": {"$cond": [{"$eq": ["$status", "returned"]}, 1, 0]}},
-            "overdue": {"$sum": {"$cond": [{"$and": [{"$eq": ["$status", "issued"]}, {"$lt": ["$due_date", datetime.utcnow()]}]}, 1, 0]}},
+            "overdue": {"$sum": {"$cond": [{"$and": [{"$eq": ["$status", "issued"]}, {"$lt": ["$due_date", datetime.now(timezone.utc).replace(tzinfo=None)]}]}, 1, 0]}},
             "last_activity": {"$max": "$issue_date"}
         }},
         {"$sort": {"issues": -1, "returns": -1}},
@@ -629,7 +652,7 @@ async def get_members_analytics(period: str = Query("last_30_days"), db=Depends(
 async def get_behaviour(period: str = Query("last_30_days"), db=Depends(get_db), current_user=Depends(has_permission("reports:view"))):
     # Heatmap needs exactly 12 weeks. If the global period is specific, we use that, but by default (or if "last_12_weeks" was requested), we need 84 days.
     # The prompt says: "If global Date Range is default/current: use Last 12 Weeks."
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     
     if period == "last_30_days" or not period:
         heatmap_start = (now - timedelta(weeks=12)).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -715,7 +738,7 @@ async def get_behaviour(period: str = Query("last_30_days"), db=Depends(get_db),
 # ---------------------------------------------------------
 @router.get("/overdue")
 async def get_overdue(db=Depends(get_db), current_user=Depends(has_permission("reports:view"))):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     # Overdue records are currently issued books where due_date is in the past
     overdue_list = list(db.borrows.find({"status": "issued", "due_date": {"$lt": now}}))
     
@@ -1171,7 +1194,7 @@ async def get_insights(period: str = Query("last_30_days"), db=Depends(get_db), 
             })
             
     # 2. Overdue activity
-    overdue_count = db.borrows.count_documents({"status": "issued", "due_date": {"$lt": datetime.utcnow()}})
+    overdue_count = db.borrows.count_documents({"status": "issued", "due_date": {"$lt": datetime.now(timezone.utc).replace(tzinfo=None)}})
     if overdue_count > 10:
         insights.append({
             "icon": "⚠️",
@@ -1254,7 +1277,16 @@ async def get_insights(period: str = Query("last_30_days"), db=Depends(get_db), 
     return {"insights": insights}
 
 @router.get("/export-all")
-async def export_all_reports(period: str = Query("last_30_days"), db=Depends(get_db), current_user=Depends(has_permission("reports:view"))):
+async def export_all_reports(
+    period: str = Query("last_30_days"), 
+    category: Optional[str] = None, 
+    author: Optional[str] = None, 
+    book_id: Optional[str] = None, 
+    member_id: Optional[str] = None, 
+    status: Optional[str] = None,
+    db=Depends(get_db), 
+    current_user=Depends(has_permission("reports:view"))
+):
     reports = [
         "Circulation Report", "Book Report", "Member Report", 
         "Overdue Report", "Fine Report", "Reservation Report", 
@@ -1263,23 +1295,59 @@ async def export_all_reports(period: str = Query("last_30_days"), db=Depends(get
     res = {}
     for r in reports:
         # Await the get_detailed_report function
-        data = await get_detailed_report(type=r, period=period, db=db, current_user=current_user)
+        data = await get_detailed_report(
+            type=r, period=period, 
+            category=category, author=author, book_id=book_id, member_id=member_id, status=status,
+            db=db, current_user=current_user
+        )
         if data:
             res[r] = data
     return res
+
 @router.get("/detailed-report")
-async def get_detailed_report(type: str = Query(...), period: str = Query("last_30_days"), db=Depends(get_db), current_user=Depends(has_permission("reports:view"))):
+async def get_detailed_report(
+    type: str = Query(...), 
+    period: str = Query("last_30_days"), 
+    category: Optional[str] = None, 
+    author: Optional[str] = None, 
+    book_id: Optional[str] = None, 
+    member_id: Optional[str] = None, 
+    status: Optional[str] = None,
+    db=Depends(get_db), 
+    current_user=Depends(has_permission("reports:view"))
+):
     start, end = _get_date_range(period)
+    
+    def book_match(b):
+        if category and b.get("genre") != category: return False
+        if author and b.get("author") != author: return False
+        if book_id and b.get("title") != book_id: return False
+        return True
+        
+    def member_match(m_id):
+        if member_id and str(m_id) != member_id: return False
+        return True
     
     if type == "Circulation Report":
         # Group borrows by date
+        b_match = _build_match_query(start, end, "issue_date", member_id=member_id, status=status)
+        if category or author or book_id:
+            bk_query = {}
+            if category: bk_query["genre"] = category
+            if author: bk_query["author"] = author
+            if book_id: bk_query["title"] = book_id
+            bks = list(db.books.find(bk_query, {"_id": 1}))
+            b_match["book_id"] = {"$in": [str(b["_id"]) for b in bks]}
+            
         borrows = list(db.borrows.aggregate([
-            {"$match": {"borrow_date": {"$gte": start, "$lte": end}}},
+            _normalize_date_field("issue_date"),
+            _normalize_date_field("due_date"),
+            {"$match": b_match},
             {"$group": {
-                "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$borrow_date"}},
+                "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$__norm_issue_date"}},
                 "issues": {"$sum": 1},
                 "returns": {"$sum": {"$cond": [{"$eq": ["$status", "returned"]}, 1, 0]}},
-                "overdue": {"$sum": {"$cond": [{"$lt": ["$due_date", datetime.utcnow()]}, {"$cond": [{"$eq": ["$status", "issued"]}, 1, 0]}, 0]}}
+                "overdue": {"$sum": {"$cond": [{"$lt": ["$__norm_due_date", datetime.now(timezone.utc).replace(tzinfo=None)]}, {"$cond": [{"$eq": ["$status", "issued"]}, 1, 0]}, 0]}}
             }},
             {"$sort": {"_id": -1}}
         ]))
@@ -1296,11 +1364,34 @@ async def get_detailed_report(type: str = Query(...), period: str = Query("last_
         return res
         
     elif type == "Book Report":
-        books = list(db.books.find())
+        bk_q = {}
+        if category: bk_q["genre"] = category
+        if author: bk_q["author"] = author
+        if book_id: bk_q["title"] = book_id
+        
+        books = list(db.books.find(bk_q))
         res = []
+        # Optimize with bulk counts
+        b_ids = [str(b["_id"]) for b in books]
+        
+        b_match = _build_match_query(start, end, "issue_date", member_id=member_id, status=status)
+        b_match["book_id"] = {"$in": b_ids}
+        issues_agg = list(db.borrows.aggregate([{"$match": b_match}, {"$group": {"_id": "$book_id", "count": {"$sum": 1}}}]))
+        issues_map = {doc["_id"]: doc["count"] for doc in issues_agg}
+        
+        r_match = _build_match_query(start, end, "created_at", member_id=member_id)
+        r_match["book_id"] = {"$in": b_ids}
+        res_agg = list(db.reservations.aggregate([{"$match": r_match}, {"$group": {"_id": "$book_id", "count": {"$sum": 1}}}]))
+        res_map = {doc["_id"]: doc["count"] for doc in res_agg}
+        
         for b in books:
-            issues = db.borrows.count_documents({"book_id": b["book_id"], "borrow_date": {"$gte": start, "$lte": end}})
-            reservations = db.reservations.count_documents({"book_id": b["book_id"], "created_at": {"$gte": start, "$lte": end}})
+            b_id_str = str(b["_id"])
+            issues = issues_map.get(b_id_str, 0)
+            reservations = res_map.get(b_id_str, 0)
+            
+            if member_id and issues == 0 and reservations == 0:
+                continue
+                
             res.append({
                 "Book": b.get("title", ""),
                 "Author": b.get("author", ""),
@@ -1313,16 +1404,60 @@ async def get_detailed_report(type: str = Query(...), period: str = Query("last_
         return sorted(res, key=lambda x: x["Issues"], reverse=True)
         
     elif type == "Member Report":
-        members = list(db.students.find())
+        m_q = {}
+        if member_id: m_q["_id"] = ObjectId(member_id) if len(str(member_id)) == 24 else member_id
+        
+        members = list(db.students.find(m_q))
         res = []
+        m_ids = [str(m.get("_id", "")) for m in members]
+        
+        b_match_all = _build_match_query(start, end, "issue_date")
+        b_match_all["student_id"] = {"$in": m_ids}
+        r_match_all = _build_match_query(start, end, "created_at")
+        r_match_all["member_id"] = {"$in": m_ids}
+        f_match_all = _build_match_query(start, end, "created_at")
+        f_match_all["member_id"] = {"$in": m_ids}
+        
+        if category or author or book_id:
+            bk_query = {}
+            if category: bk_query["genre"] = category
+            if author: bk_query["author"] = author
+            if book_id: bk_query["title"] = book_id
+            bks = list(db.books.find(bk_query, {"_id": 1}))
+            bk_ids = [str(b["_id"]) for b in bks]
+            b_match_all["book_id"] = {"$in": bk_ids}
+            r_match_all["book_id"] = {"$in": bk_ids}
+            f_match_all["book_id"] = {"$in": bk_ids}
+            
+        b_agg = list(db.borrows.aggregate([
+            {"$match": b_match_all},
+            {"$group": {
+                "_id": "$student_id",
+                "issues": {"$sum": 1},
+                "returns": {"$sum": {"$cond": [{"$eq": ["$status", "returned"]}, 1, 0]}},
+                "overdue": {"$sum": {"$cond": [{"$and": [{"$lt": [{"$cond": {"if": {"$eq": [{"$type": "$due_date"}, "date"]}, "then": "$due_date", "else": {"$dateFromString": {"dateString": "$due_date", "onError": None, "onNull": None}}}}, datetime.now(timezone.utc).replace(tzinfo=None)]}, {"$eq": ["$status", "issued"]}]}, 1, 0]}}
+            }}
+        ]))
+        b_map = {doc["_id"]: doc for doc in b_agg}
+        
+        r_agg = list(db.reservations.aggregate([{"$match": r_match_all}, {"$group": {"_id": "$member_id", "count": {"$sum": 1}}}]))
+        r_map = {doc["_id"]: doc["count"] for doc in r_agg}
+        
+        f_agg = list(db.fines.aggregate([{"$match": f_match_all}, {"$group": {"_id": "$member_id", "total": {"$sum": "$amount"}}}]))
+        f_map = {doc["_id"]: doc["total"] for doc in f_agg}
+        
         for m in members:
-            member_id = str(m.get("_id", ""))
-            issues = db.borrows.count_documents({"member_id": member_id, "borrow_date": {"$gte": start, "$lte": end}})
-            returns = db.borrows.count_documents({"member_id": member_id, "status": "returned", "return_date": {"$gte": start, "$lte": end}})
-            overdue = db.borrows.count_documents({"member_id": member_id, "status": "issued", "due_date": {"$lt": datetime.utcnow()}})
-            fines = list(db.fines.find({"member_id": member_id, "created_at": {"$gte": start, "$lte": end}}))
-            total_fine = sum(f.get("amount", 0) for f in fines)
-            reservations = db.reservations.count_documents({"member_id": member_id, "created_at": {"$gte": start, "$lte": end}})
+            m_id = str(m.get("_id", ""))
+            
+            issues = b_map.get(m_id, {}).get("issues", 0)
+            returns = b_map.get(m_id, {}).get("returns", 0)
+            overdue = b_map.get(m_id, {}).get("overdue", 0)
+            reservations = r_map.get(m_id, 0)
+            total_fine = f_map.get(m_id, 0)
+            
+            if (category or author or book_id) and issues == 0 and reservations == 0 and total_fine == 0:
+                continue
+                
             res.append({
                 "Member": m.get("name", ""),
                 "Issues": issues,
@@ -1334,19 +1469,54 @@ async def get_detailed_report(type: str = Query(...), period: str = Query("last_
         return sorted(res, key=lambda x: x["Issues"], reverse=True)
         
     elif type == "Overdue Report":
-        borrows = list(db.borrows.find({"status": "issued", "due_date": {"$lt": datetime.utcnow()}}))
+        b_match = {"status": "issued", "$expr": {"$lt": [{"$cond": {"if": {"$eq": [{"$type": "$due_date"}, "date"]}, "then": "$due_date", "else": {"$dateFromString": {"dateString": "$due_date", "onError": None, "onNull": None}}}}, datetime.now(timezone.utc).replace(tzinfo=None)]}}
+        if member_id: b_match["student_id"] = member_id
+        if category or author or book_id:
+            bk_query = {}
+            if category: bk_query["genre"] = category
+            if author: bk_query["author"] = author
+            if book_id: bk_query["title"] = book_id
+            bks = list(db.books.find(bk_query, {"book_id": 1}))
+            b_match["book_id"] = {"$in": [b["book_id"] for b in bks]}
+            
+        borrows = list(db.borrows.find(b_match))
+        
+        m_ids = list({b.get("student_id") for b in borrows if b.get("student_id")})
+        b_ids = list({b.get("book_id") for b in borrows if b.get("book_id")})
+        
+        m_objs = list(db.students.find({"$or": [{"_id": {"$in": [ObjectId(m) for m in m_ids if len(str(m))==24]}}, {"student_id": {"$in": m_ids}}]}))
+        m_dict = {str(m["_id"]): m for m in m_objs}
+        for m in m_objs: m_dict[m.get("student_id")] = m
+        
+        b_objs = list(db.books.find({"_id": {"$in": [ObjectId(bk) for bk in b_ids if len(str(bk))==24]}}))
+        bk_dict = {str(bk["_id"]): bk for bk in b_objs}
+        
         res = []
         for b in borrows:
-            m = db.students.find_one({"_id": ObjectId(b["member_id"])}) if len(str(b.get("member_id",""))) == 24 else None
-            bk = db.books.find_one({"book_id": b["book_id"]})
-            days = (datetime.utcnow() - b["due_date"]).days
+            m = m_dict.get(b.get("student_id"))
+            bk = bk_dict.get(b.get("book_id"))
+            due_d = b.get("due_date")
+            if isinstance(due_d, str):
+                try: due_d = datetime.fromisoformat(due_d.replace("Z", "+00:00"))
+                except: due_d = datetime.now(timezone.utc).replace(tzinfo=None)
+            days = (datetime.now(timezone.utc).replace(tzinfo=None) - (due_d.replace(tzinfo=None) if due_d else datetime.now(timezone.utc).replace(tzinfo=None))).days
+            if days < 0: days = 0
             # Calculate hypothetical fine (e.g. 5 per day)
             fine = days * 5
+            
+            issue_d = b.get("issue_date")
+            issue_str = "-"
+            if isinstance(issue_d, datetime): issue_str = issue_d.strftime("%Y-%m-%d")
+            elif isinstance(issue_d, str): issue_str = issue_d[:10]
+            
+            due_str = "-"
+            if isinstance(due_d, datetime): due_str = due_d.strftime("%Y-%m-%d")
+            
             res.append({
-                "Member": m["name"] if m else "Unknown",
+                "Member": m.get("name", "Unknown") if m else b.get("student_name", "Unknown"),
                 "Book": bk["title"] if bk else "Unknown",
-                "Issue Date": b["borrow_date"].strftime("%Y-%m-%d"),
-                "Due Date": b["due_date"].strftime("%Y-%m-%d"),
+                "Issue Date": issue_str,
+                "Due Date": due_str,
                 "Days Overdue": days,
                 "Fine": fine,
                 "Status": "Critical" if days > 30 else "Warning"
@@ -1354,46 +1524,103 @@ async def get_detailed_report(type: str = Query(...), period: str = Query("last_
         return sorted(res, key=lambda x: x["Days Overdue"], reverse=True)
         
     elif type == "Fine Report":
-        fines = list(db.fines.find({"created_at": {"$gte": start, "$lte": end}}))
+        f_match = _build_match_query(start, end, "created_at", member_id=member_id)
+        if category or author or book_id:
+            bk_query = {}
+            if category: bk_query["genre"] = category
+            if author: bk_query["author"] = author
+            if book_id: bk_query["title"] = book_id
+            bks = list(db.books.find(bk_query, {"_id": 1}))
+            f_match["book_id"] = {"$in": [str(b["_id"]) for b in bks]}
+            
+        fines = list(db.fines.find(f_match))
+        
+        m_ids = list({f.get("member_id") for f in fines if f.get("member_id")})
+        b_ids = list({f.get("book_id") for f in fines if f.get("book_id")})
+        
+        m_objs = list(db.students.find({"$or": [{"_id": {"$in": [ObjectId(m) for m in m_ids if len(str(m))==24]}}, {"student_id": {"$in": m_ids}}]}))
+        m_dict = {str(m["_id"]): m for m in m_objs}
+        for m in m_objs: m_dict[m.get("student_id")] = m
+        
+        b_objs = list(db.books.find({"_id": {"$in": [ObjectId(bk) for bk in b_ids if len(str(bk))==24]}}))
+        bk_dict = {str(bk["_id"]): bk for bk in b_objs}
+        
         res = []
         for f in fines:
-            m = db.students.find_one({"_id": ObjectId(f["member_id"])}) if len(str(f.get("member_id",""))) == 24 else None
-            bk = db.books.find_one({"book_id": f.get("book_id", "")})
+            m = m_dict.get(f.get("member_id"))
+            bk = bk_dict.get(f.get("book_id"))
             res.append({
-                "Member": m["name"] if m else "Unknown",
+                "Member": m.get("name", "Unknown") if m else "Unknown",
                 "Book": bk["title"] if bk else "Unknown",
                 "Fine": f.get("amount", 0),
                 "Paid": "Yes" if f.get("paid") else "No",
                 "Status": "Collected" if f.get("paid") else "Pending",
-                "Date": f.get("created_at").strftime("%Y-%m-%d")
+                "Date": f.get("created_at").strftime("%Y-%m-%d") if isinstance(f.get("created_at"), datetime) else str(f.get("created_at"))[:10] if f.get("created_at") else "-"
             })
         return sorted(res, key=lambda x: x["Date"], reverse=True)
         
     elif type == "Reservation Report":
-        resv = list(db.reservations.find({"created_at": {"$gte": start, "$lte": end}}))
+        r_match = _build_match_query(start, end, "created_at", member_id=member_id)
+        if status:
+            if status == "issued": r_match["status"] = {"$in": ["ready", "completed"]}
+            elif status == "returned": r_match["status"] = "pending"
+            else: r_match["status"] = status
+        if category or author or book_id:
+            bk_query = {}
+            if category: bk_query["genre"] = category
+            if author: bk_query["author"] = author
+            if book_id: bk_query["title"] = book_id
+            bks = list(db.books.find(bk_query, {"_id": 1}))
+            r_match["book_id"] = {"$in": [str(b["_id"]) for b in bks]}
+            
+        resv = list(db.reservations.find(r_match))
+        
+        m_ids = list({r.get("member_id") for r in resv if r.get("member_id")})
+        b_ids = list({r.get("book_id") for r in resv if r.get("book_id")})
+        
+        m_objs = list(db.students.find({"$or": [{"_id": {"$in": [ObjectId(m) for m in m_ids if len(str(m))==24]}}, {"student_id": {"$in": m_ids}}]}))
+        m_dict = {str(m["_id"]): m for m in m_objs}
+        for m in m_objs: m_dict[m.get("student_id")] = m
+        
+        b_objs = list(db.books.find({"_id": {"$in": [ObjectId(bk) for bk in b_ids if len(str(bk))==24]}}))
+        bk_dict = {str(bk["_id"]): bk for bk in b_objs}
+        
         res = []
         for r in resv:
-            m = db.students.find_one({"_id": ObjectId(r["member_id"])}) if len(str(r.get("member_id",""))) == 24 else None
-            bk = db.books.find_one({"book_id": r["book_id"]})
+            m = m_dict.get(r.get("member_id"))
+            bk = bk_dict.get(r.get("book_id"))
             wait_time = None
             if r.get("completed_at"):
                 wait_time = (r["completed_at"] - r["created_at"]).days
             res.append({
                 "Book": bk["title"] if bk else "Unknown",
-                "Member": m["name"] if m else "Unknown",
-                "Reservation Date": r["created_at"].strftime("%Y-%m-%d"),
+                "Member": m.get("name", "Unknown") if m else "Unknown",
+                "Reservation Date": r["created_at"].strftime("%Y-%m-%d") if isinstance(r.get("created_at"), datetime) else str(r.get("created_at"))[:10] if r.get("created_at") else "-",
                 "Status": r.get("status", "Pending").capitalize(),
-                "Completed Date": r["completed_at"].strftime("%Y-%m-%d") if r.get("completed_at") else "-",
+                "Completed Date": r["completed_at"].strftime("%Y-%m-%d") if isinstance(r.get("completed_at"), datetime) else str(r.get("completed_at"))[:10] if r.get("completed_at") else "-",
                 "Waiting Time": f"{wait_time} days" if wait_time is not None else "-"
             })
         return sorted(res, key=lambda x: x["Reservation Date"], reverse=True)
         
     elif type == "Inventory Report":
-        books = list(db.books.find())
+        bk_q = {}
+        if category: bk_q["genre"] = category
+        if author: bk_q["author"] = author
+        if book_id: bk_q["title"] = book_id
+        
+        books = list(db.books.find(bk_q))
+        
+        b_ids = [str(b["_id"]) for b in books]
+        issues_agg = list(db.borrows.aggregate([{"$match": {"book_id": {"$in": b_ids}, "status": "issued"}}, {"$group": {"_id": "$book_id", "count": {"$sum": 1}}}]))
+        issues_map = {doc["_id"]: doc["count"] for doc in issues_agg}
+        
+        res_agg = list(db.reservations.aggregate([{"$match": {"book_id": {"$in": b_ids}, "status": "pending"}}, {"$group": {"_id": "$book_id", "count": {"$sum": 1}}}]))
+        res_map = {doc["_id"]: doc["count"] for doc in res_agg}
+        
         res = []
         for b in books:
-            issues = db.borrows.count_documents({"book_id": b["book_id"], "status": "issued"})
-            reservations = db.reservations.count_documents({"book_id": b["book_id"], "status": "pending"})
+            issues = issues_map.get(str(b["_id"]), 0)
+            reservations = res_map.get(str(b["_id"]), 0)
             res.append({
                 "Book": b.get("title", ""),
                 "Author": b.get("author", ""),
@@ -1406,16 +1633,29 @@ async def get_detailed_report(type: str = Query(...), period: str = Query("last_
         return res
         
     elif type == "Acquisition Report":
-        books = list(db.books.find({"created_at": {"$gte": start, "$lte": end}}))
+        bk_q = _build_match_query(start, end, "created_at")
+        if category: bk_q["genre"] = category
+        if author: bk_q["author"] = author
+        if book_id: bk_q["title"] = book_id
+        
+        books = list(db.books.find(bk_q))
+        b_ids = [str(b["_id"]) for b in books]
+        
+        issues_agg = list(db.borrows.aggregate([{"$match": {"book_id": {"$in": b_ids}}}, {"$group": {"_id": "$book_id", "count": {"$sum": 1}}}]))
+        issues_map = {doc["_id"]: doc["count"] for doc in issues_agg}
+        
+        res_agg = list(db.reservations.aggregate([{"$match": {"book_id": {"$in": b_ids}}}, {"$group": {"_id": "$book_id", "count": {"$sum": 1}}}]))
+        res_map = {doc["_id"]: doc["count"] for doc in res_agg}
+        
         res = []
         for b in books:
-            issues = db.borrows.count_documents({"book_id": b["book_id"]})
-            reservations = db.reservations.count_documents({"book_id": b["book_id"]})
+            issues = issues_map.get(str(b["_id"]), 0)
+            reservations = res_map.get(str(b["_id"]), 0)
             res.append({
                 "Book": b.get("title", ""),
                 "Author": b.get("author", ""),
                 "Category": b.get("genre", ""),
-                "Added Date": b.get("created_at").strftime("%Y-%m-%d") if b.get("created_at") else "-",
+                "Added Date": b.get("created_at").strftime("%Y-%m-%d") if isinstance(b.get("created_at"), datetime) else str(b.get("created_at"))[:10] if b.get("created_at") else "-",
                 "Issues": issues,
                 "Reservations": reservations,
                 "Borrowed Status": "Active" if issues > 0 else "Never Borrowed"
@@ -1423,11 +1663,16 @@ async def get_detailed_report(type: str = Query(...), period: str = Query("last_
         return sorted(res, key=lambda x: x["Added Date"], reverse=True)
         
     elif type == "Activity Report":
-        logs = list(db.audit_logs.find({"timestamp": {"$gte": start, "$lte": end}}).sort("timestamp", -1))
+        a_match = _build_match_query(start, end, "timestamp")
+        if member_id:
+            m = db.students.find_one({"_id": ObjectId(member_id)}) if len(str(member_id)) == 24 else db.students.find_one({"student_id": member_id})
+            if m: a_match["username"] = m.get("name", "Unknown")
+        
+        logs = list(db.audit_logs.find(a_match).sort("timestamp", -1))
         res = []
         for log in logs:
             res.append({
-                "Timestamp": log.get("timestamp").strftime("%Y-%m-%d %H:%M:%S") if log.get("timestamp") else "-",
+                "Timestamp": log.get("timestamp").strftime("%Y-%m-%d %H:%M:%S") if isinstance(log.get("timestamp"), datetime) else str(log.get("timestamp"))[:19].replace("T", " ") if log.get("timestamp") else "-",
                 "Event": log.get("action", "Unknown"),
                 "Description": log.get("details", ""),
                 "Member": log.get("username", "System")

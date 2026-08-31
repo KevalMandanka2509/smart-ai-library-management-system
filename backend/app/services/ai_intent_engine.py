@@ -2,7 +2,7 @@ import os
 import json
 import urllib.request
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from bson.objectid import ObjectId
 
 class AIIntentEngine:
@@ -17,11 +17,8 @@ class AIIntentEngine:
         self.confidence = 1.0
 
     def get_gemini_key(self):
-        # We can read from os.environ or config
-        key = os.environ.get("GEMINI_API_KEY", "")
-        if not key or key == "<YOUR_GEMINI_API_KEY>" or not key.startswith("AIza"):
-            return None
-        return key
+        from app.services.gemini_key_manager import GeminiKeyManager
+        return GeminiKeyManager().get_available_key()
 
     def detect_language_fallback(self, message: str):
         msg_lower = message.lower()
@@ -122,25 +119,27 @@ class AIIntentEngine:
             self.intents.append("UNKNOWN")
 
     def call_gemini_json(self, prompt: str, system: str):
-        key = self.get_gemini_key()
-        if not key:
-            return None
-            
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key}"
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "systemInstruction": {"parts": [{"text": system}]},
-            "generationConfig": {
-                "temperature": 0.1,
-                "responseMimeType": "application/json"
+        from app.services.gemini_key_manager import GeminiKeyManager
+        manager = GeminiKeyManager()
+        
+        def _make_req(api_key):
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "systemInstruction": {"parts": [{"text": system}]},
+                "generationConfig": {
+                    "temperature": 0.1,
+                    "responseMimeType": "application/json"
+                }
             }
-        }
-        try:
             req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'}, method='POST')
             with urllib.request.urlopen(req, timeout=10) as response:
                 resp_json = json.loads(response.read().decode('utf-8'))
                 text = resp_json['candidates'][0]['content']['parts'][0]['text']
                 return json.loads(text)
+        
+        try:
+            return manager.execute_with_failover(_make_req)
         except Exception as e:
             print(f"Gemini API Error: {e}")
             return None
@@ -281,7 +280,7 @@ Output ONLY a JSON object:
 
         elif intent == "OVERDUE_BORROWS":
             from datetime import datetime
-            query = {"status": "issued", "due_date": {"$lt": datetime.utcnow().strftime("%Y-%m-%d")}}
+            query = {"status": "issued", "due_date": {"$lt": datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d")}}
             if self.role == "member":
                 query["student_id"] = self.username
             
@@ -381,3 +380,4 @@ def process_chat_query(message: str, db_client, role: str, username: str, histor
     engine.detect_intents_and_entities(message, history)
     engine.authorize_and_execute()
     return engine.generate_response()
+    

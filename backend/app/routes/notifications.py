@@ -1,3 +1,4 @@
+from datetime import timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from bson import ObjectId
 from typing import List, Optional
@@ -170,7 +171,7 @@ async def create_system_notification(
             "title": payload.title,
             "message": payload.message,
             "type": "system_broadcast",
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc).replace(tzinfo=None),
             "read": False
         }
         db.notifications.insert_one(new_notif)
@@ -186,7 +187,7 @@ async def create_system_notification(
                     "title": payload.title,
                     "message": payload.message,
                     "type": "system_broadcast",
-                    "created_at": datetime.utcnow(),
+                    "created_at": datetime.now(timezone.utc).replace(tzinfo=None),
                     "read": False
                 })
         if new_notifs:

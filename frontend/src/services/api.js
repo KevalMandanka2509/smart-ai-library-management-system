@@ -378,8 +378,25 @@ export const deleteNotification = async (id) => {
 
 // ===== Analytics API =====
 export const getDashboardAnalytics = async () => {
-  const response = await api.get('/analytics/dashboard');
-  return response.data;
+  const [dashRes, catRes] = await Promise.allSettled([
+    api.get('/analytics/dashboard'),
+    api.get('/enterprise_analytics/categories?period=all_time')
+  ]);
+  
+  if (dashRes.status === 'rejected') {
+    throw dashRes.reason;
+  }
+  
+  const data = dashRes.value.data;
+  if (!data.books) data.books = {};
+  
+  if (catRes.status === 'fulfilled' && catRes.value.data) {
+    data.books.by_category = catRes.value.data.distribution || [];
+  } else {
+    data.books.by_category = [];
+  }
+  
+  return data;
 };
 
 export const getAnalyticsReports = async (granularity = 'monthly', period = 12) => {

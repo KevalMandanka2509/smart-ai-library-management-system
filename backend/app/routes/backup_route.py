@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
 from fastapi.responses import StreamingResponse
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from bson import ObjectId
 import json
 import io
@@ -44,7 +44,7 @@ async def create_manual_backup(
     db=Depends(get_db),
     current_admin=Depends(get_current_admin)
 ):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     filename = f"smart_library_backup_{now.strftime('%Y%m%d_%H%M%S')}.json"
 
     books = list(db.books.find({}))

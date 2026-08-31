@@ -52,7 +52,9 @@ const BookDetailPage = () => {
       try {
         const user = JSON.parse(stored);
         setIsAdmin(user.role === 'admin');
-      } catch (_) { /* ignore */ }
+      } catch (_) { 
+        console.error("Failed to parse user role.");
+      }
     }
   }, []);
 

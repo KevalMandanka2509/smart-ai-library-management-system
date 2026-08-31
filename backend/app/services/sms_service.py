@@ -3,7 +3,7 @@ import random
 import string
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 
 from ..config import settings
@@ -116,7 +116,7 @@ class SmsService:
                     "template_args": template_args or {},
                     "status": status_str,
                     "provider": config.get("provider", "mock"),
-                    "dispatched_at": datetime.utcnow()
+                    "dispatched_at": datetime.now(timezone.utc).replace(tzinfo=None)
                 }
                 db.sms_logs.insert_one(log_entry)
             except Exception as e:
@@ -135,7 +135,7 @@ class SmsService:
         if db is not None:
             existing = db.otp_store.find_one({"phone": phone})
             if existing and existing.get("last_sent_at"):
-                time_diff = datetime.utcnow() - existing["last_sent_at"]
+                time_diff = datetime.now(timezone.utc).replace(tzinfo=None) - existing["last_sent_at"]
                 if time_diff.total_seconds() < 60:
                     from fastapi import HTTPException
                     raise HTTPException(status_code=429, detail="Please wait 60 seconds before requesting another OTP.")
@@ -154,9 +154,9 @@ class SmsService:
                         "$set": {
                             "phone": phone,
                             "code": hashed_code,
-                            "expires_at": datetime.utcnow() + timedelta(minutes=5),
+                            "expires_at": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5),
                             "attempts": 0,
-                            "last_sent_at": datetime.utcnow()
+                            "last_sent_at": datetime.now(timezone.utc).replace(tzinfo=None)
                         }
                     },
                     upsert=True
@@ -186,7 +186,7 @@ class SmsService:
 
             # Check expiration
             expires_at = record.get("expires_at")
-            if expires_at and expires_at < datetime.utcnow():
+            if expires_at and expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
                 db.otp_store.delete_one({"phone": phone})
                 return False
 

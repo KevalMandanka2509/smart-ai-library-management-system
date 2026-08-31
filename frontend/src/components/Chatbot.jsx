@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { sendChatMessage, streamChatMessage, getChatSessions, getAiStatus } from '../services/api';
+import { streamChatMessage, getChatSessions, getAiStatus } from '../services/api';
 import './Chatbot.css';
 
 // Helper to check if text contains a markdown table
@@ -98,7 +98,9 @@ const Chatbot = () => {
       try {
         const p = JSON.parse(stored);
         setUserName(p.full_name || 'Member');
-      } catch (_) { }
+      } catch (_) { 
+        console.error("Failed to parse user from local storage.");
+      }
     }
     
     getAiStatus().then(data => {

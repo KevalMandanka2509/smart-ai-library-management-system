@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile
 from bson import ObjectId
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..database import get_db
 from ..models.book import book_document, serialize_book, serialize_books
@@ -317,7 +317,7 @@ async def bulk_delete_books(
             )
 
     if books:
-        recycle_docs = [{"original_collection": "books", "record": b, "deleted_at": datetime.utcnow(), "deleted_by": current_user.get("username", "admin"), "display_name": b.get("title", "Unknown Book")} for b in books]
+        recycle_docs = [{"original_collection": "books", "record": b, "deleted_at": datetime.now(timezone.utc).replace(tzinfo=None), "deleted_by": current_user.get("username", "admin"), "display_name": b.get("title", "Unknown Book")} for b in books]
         db.recycle_bin.insert_many(recycle_docs)
     result = db.books.delete_many({"_id": {"$in": object_ids}})
     return {
@@ -571,7 +571,7 @@ async def update_book(
         update_data["is_available"] = update_data["available_copies"] > 0
     
     # Add updated_at timestamp
-    update_data["updated_at"] = datetime.utcnow()
+    update_data["updated_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
     
     from pymongo import ReturnDocument
     from pymongo.errors import DuplicateKeyError
@@ -638,7 +638,7 @@ async def delete_book(book_id: str, db=Depends(get_db), current_user=Depends(has
             detail=f"Cannot delete book. There are {active_reservations} active reservation(s) for this book."
         )
     if book:
-        db.recycle_bin.insert_one({"original_collection": "books", "record": book, "deleted_at": datetime.utcnow(), "deleted_by": current_user.get("username", "admin"), "display_name": book.get("title", "Unknown Book")})
+        db.recycle_bin.insert_one({"original_collection": "books", "record": book, "deleted_at": datetime.now(timezone.utc).replace(tzinfo=None), "deleted_by": current_user.get("username", "admin"), "display_name": book.get("title", "Unknown Book")})
     result = collection.delete_one({"_id": ObjectId(book_id)})
     
     if result.deleted_count == 0:

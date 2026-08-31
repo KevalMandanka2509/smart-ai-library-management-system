@@ -201,7 +201,7 @@ export const BorrowActivityHeatmap = memo(({ trend }) => {
 
   // Construct a grid containing exactly 91 days (7 rows by 13 columns)
   // aligned to day-of-week rows to match GitHub Contributions exactly.
-  const { grid, monthsHeader, totalActivity } = useMemo(() => {
+  const { grid, monthsHeader } = useMemo(() => {
     const today = new Date();
     const gridDays = 91; // 13 weeks * 7 days
 
@@ -376,7 +376,7 @@ export const BorrowActivityHeatmap = memo(({ trend }) => {
 // ─────────────────────────────────────────────────────────────
 // SVG Donut chart
 // ─────────────────────────────────────────────────────────────
-export const COLORS = ['#D4A017', '#3b82f6', '#16a34a', '#ea580c', '#8b5cf6', '#ec4899', '#0ea5e9', '#f59e0b'];
+const COLORS = ['#D4A017', '#3b82f6', '#16a34a', '#ea580c', '#8b5cf6', '#ec4899', '#0ea5e9', '#f59e0b'];
 
 export const DonutChart = memo(({ slices }) => {
   if (!slices || slices.length === 0) {
@@ -422,10 +422,10 @@ export const DonutChart = memo(({ slices }) => {
         );
       })}
       <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="11" fontWeight="bold" fill="#1e1b15">
-        {slices.length}
+        {total}
       </text>
       <text x={cx} y={cy + 13} textAnchor="middle" dominantBaseline="middle" fontSize="8" fill="#9ca3af">
-        genres
+        books
       </text>
     </svg>
   );

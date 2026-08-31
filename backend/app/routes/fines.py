@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from datetime import datetime
+from datetime import datetime, timezone
 from bson import ObjectId
 from typing import List
 
@@ -51,7 +51,7 @@ async def get_fines(
     total = db.fines.count_documents(query)
     
     if not paid:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         borrow_query = {"status": "issued", "due_date": {"$lt": now}}
         if not is_admin:
             borrow_query["student_id"] = current_user.get("username")
@@ -134,7 +134,7 @@ async def pay_fine(request: FinePayRequest, db=Depends(get_db), current_user=Dep
         {
             "$set": {
                 "paid": True,
-                "paid_at": datetime.utcnow()
+                "paid_at": datetime.now(timezone.utc).replace(tzinfo=None)
             }
         }
     )

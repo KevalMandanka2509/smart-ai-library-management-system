@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def author_document(data: dict) -> dict:
@@ -10,8 +10,8 @@ def author_document(data: dict) -> dict:
         "nationality": data.get("nationality", ""),
         "status": data.get("status", "active"),
         "is_deleted": False,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(timezone.utc).replace(tzinfo=None),
+        "updated_at": datetime.now(timezone.utc).replace(tzinfo=None)
     }
 
 
@@ -21,8 +21,8 @@ def serialize_author(author: dict) -> dict:
         if "_id" in author:
             author["id"] = str(author["_id"])
             del author["_id"]
-        author.setdefault("created_at", datetime.utcnow())
-        author.setdefault("updated_at", datetime.utcnow())
+        author.setdefault("created_at", datetime.now(timezone.utc).replace(tzinfo=None))
+        author.setdefault("updated_at", datetime.now(timezone.utc).replace(tzinfo=None))
     return author
 
 

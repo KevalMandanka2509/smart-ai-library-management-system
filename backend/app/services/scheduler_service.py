@@ -2,7 +2,7 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import asyncio
 from typing import Any
 import uuid
@@ -18,7 +18,7 @@ WORKER_ID = f"{socket.gethostname()}-{uuid.uuid4().hex[:8]}"
 
 def acquire_lock(db, job_id: str, worker_id: str, ttl_seconds: int = 300) -> bool:
     """Acquire a distributed lock for a scheduled job."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     expires_at = now + timedelta(seconds=ttl_seconds)
     
     # Create unique index if it doesn't exist
@@ -83,7 +83,7 @@ async def generate_and_send_scheduled_reports():
         logger.error(f"Scheduler could not access database: {e}")
         return
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     reports = list(raw_db.scheduled_reports.find({}))
     
     for report in reports:
@@ -185,7 +185,7 @@ async def generate_and_send_scheduled_reports():
                 # Update last_sent and release lock
                 raw_db.scheduled_reports.update_one(
                     {"_id": report_id},
-                    {"$set": {"last_sent": datetime.utcnow()}}
+                    {"$set": {"last_sent": datetime.now(timezone.utc).replace(tzinfo=None)}}
                 )
                 release_lock(raw_db, job_id, WORKER_ID)
                 logger.info(f"✅ Successfully sent {freq} report to {email}")

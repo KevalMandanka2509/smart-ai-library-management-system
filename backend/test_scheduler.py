@@ -1,6 +1,6 @@
 import os
 from pymongo import MongoClient
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import asyncio
 import time
 
@@ -11,7 +11,7 @@ db = client["library_db"]
 
 async def async_main():
     # Insert a dummy scheduled report that was created a while ago
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     # pretend we sent it 2 days ago for a daily report
     db.scheduled_reports.delete_many({"email": "admin@example.com"})
     db.email_logs.delete_many({"template_name": "scheduled_report"})

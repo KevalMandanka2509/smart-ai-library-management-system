@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from typing import Optional
 
@@ -35,7 +35,7 @@ def _date_key(dt, granularity: str) -> str:
 # ─────────────────────────────────────────────
 @router.get("/dashboard")
 async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_permission("reports:view"))):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     start_30 = now - timedelta(days=30)
     start_7 = now - timedelta(days=7)
 
@@ -242,7 +242,7 @@ async def get_reports(
     db=Depends(get_db),
     current_user=Depends(has_permission("reports:view"))
 ):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
 
     if granularity == "daily":
         start = now - timedelta(days=period)
@@ -391,7 +391,7 @@ async def schedule_report(
     db.scheduled_reports.insert_one({
         "frequency": req.frequency,
         "email": req.email,
-        "created_at": datetime.utcnow()
+        "created_at": datetime.now(timezone.utc).replace(tzinfo=None)
     })
     return {"message": "Report scheduled successfully"}
 
