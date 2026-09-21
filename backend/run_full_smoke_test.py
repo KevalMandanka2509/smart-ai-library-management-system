@@ -104,7 +104,7 @@ try:
                 results["Reservations"] = "FAIL Missing ID in active list"
         else:
             results["Reservations"] = f"FAIL {resp.status_code} {resp.text}"
-        if rb_id:
+        if rb_id and str(rb_id) != "None":
             requests.delete(f"{base_url}/api/v1/books/{rb_id}", headers=headers)
 except Exception as e:
     results["Reservations"] = f"FAIL {e}"
@@ -138,7 +138,7 @@ except Exception as e:
     results["Librarian RBAC"] = f"FAIL {e}"
 
 # Cleanup
-if b_id:
+if b_id and str(b_id) != "None":
     requests.delete(f"{base_url}/api/v1/books/{b_id}", headers=headers)
 
 db.users.delete_many({"email": {"$in": [member_email, librarian_email]}})

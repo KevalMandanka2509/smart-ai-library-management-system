@@ -8,6 +8,7 @@ const ForgotPassword = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [step, setStep] = useState(1);
@@ -15,6 +16,14 @@ const ForgotPassword = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [demoOtp, setDemoOtp] = useState('');
+
+  const extractErrorMessage = (err, defaultMessage) => {
+    const detail = err?.response?.data?.detail;
+    if (Array.isArray(detail)) {
+      return detail[0]?.msg || defaultMessage;
+    }
+    return typeof detail === 'string' ? detail : defaultMessage;
+  };
 
   const handleSendOtp = async (e) => {
     e.preventDefault();
@@ -35,7 +44,7 @@ const ForgotPassword = () => {
       }
       setStep(2);
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Failed to send OTP. Verify your email.');
+      setError(extractErrorMessage(err, 'Failed to send OTP. Verify your email.'));
     } finally {
       setIsLoading(false);
     }
@@ -53,11 +62,23 @@ const ForgotPassword = () => {
 
     setIsLoading(true);
     try {
-      await verifyOTP(email, otp);
+      const res = await verifyOTP(email, otp);
+      console.log('Verify OTP response:', res);
+      
+      // Robustly extract token in case of unexpected nesting
+      const extractedToken = res?.reset_token || res?.data?.reset_token;
+      
+      if (extractedToken) {
+        console.log('Token captured:', extractedToken.substring(0, 5) + '...');
+        setResetToken(extractedToken);
+      } else {
+        console.error('Warning: reset_token not found in response', res);
+      }
+      
       setSuccess('Verification code accepted. Please set your new password.');
       setStep(3);
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Invalid or expired verification code.');
+      setError(extractErrorMessage(err, 'Invalid or expired verification code.'));
     } finally {
       setIsLoading(false);
     }
@@ -68,9 +89,15 @@ const ForgotPassword = () => {
     setError('');
     setSuccess('');
 
-    if (!password || password.length < 6) {
-      setError('Password must be at least 6 characters long.');
+    if (!password) {
+      setError('Password is required.');
       return;
+    } else {
+      const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+      if (!strongPasswordRegex.test(password)) {
+        setError('Password must be at least 8 characters, include an uppercase, lowercase, number, and special character.');
+        return;
+      }
     }
 
     if (password !== confirmPassword) {
@@ -80,13 +107,17 @@ const ForgotPassword = () => {
 
     setIsLoading(true);
     try {
-      await resetPassword(email, otp, password);
+      console.log('Sending reset token:', resetToken ? resetToken.substring(0, 5) + '...' : 'EMPTY!');
+      if (!resetToken) {
+        throw new Error("Missing reset token. Please verify OTP again.");
+      }
+      await resetPassword(email, resetToken, password);
       setSuccess('Password reset successful! Redirecting to login...');
       setTimeout(() => {
         navigate('/login');
       }, 2000);
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Failed to reset password. Try again.');
+      setError(extractErrorMessage(err, 'Failed to reset password. Try again.'));
     } finally {
       setIsLoading(false);
     }

@@ -46,11 +46,11 @@ if admin_token:
     me_resp = requests.get(f"{base_url}/api/v1/profile/me", headers={"Authorization": f"Bearer {admin_token}"})
     print(f"/profile/me: {'PASS' if me_resp.status_code == 200 else 'FAIL - ' + str(me_resp.status_code)}")
     
-    rbac_resp = requests.get(f"{base_url}/api/v1/reports/dashboard", headers={"Authorization": f"Bearer {admin_token}"})
+    rbac_resp = requests.get(f"{base_url}/api/v1/analytics/dashboard", headers={"Authorization": f"Bearer {admin_token}"})
     print(f"Admin RBAC: {'PASS' if rbac_resp.status_code == 200 else 'FAIL - ' + str(rbac_resp.status_code)}")
 
 if member_token:
-    rbac_neg = requests.get(f"{base_url}/api/v1/reports/dashboard", headers={"Authorization": f"Bearer {member_token}"})
+    rbac_neg = requests.get(f"{base_url}/api/v1/analytics/dashboard", headers={"Authorization": f"Bearer {member_token}"})
     print(f"Member RBAC (Negative): {'PASS' if rbac_neg.status_code in [401, 403] else 'FAIL - ' + str(rbac_neg.status_code)}")
 
 # Cleanup

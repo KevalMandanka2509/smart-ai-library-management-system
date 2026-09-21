@@ -88,6 +88,8 @@ async def search_books_advanced(
 
     pipeline = [
         {"$match": filt},
+        # Exclude large binary/base64 fields to prevent BSON 16MB limit overflow
+        {"$project": {"cover_image": 0, "file_data": 0}},
         {"$facet": {
             "metadata": [{"$count": "total"}],
             "data": [

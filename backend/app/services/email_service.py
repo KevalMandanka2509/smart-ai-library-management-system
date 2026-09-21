@@ -208,20 +208,19 @@ class EmailService:
         from_name = settings.SMTP_FROM_NAME
         tls = settings.SMTP_TLS
 
-        if db is not None:
-            try:
-                smtp_doc = db.system_settings.find_one({"key": "smtp_config"})
-                if smtp_doc and smtp_doc.get("value"):
-                    val = smtp_doc["value"]
-                    host = val.get("host", host)
-                    port = int(val.get("port", port))
-                    user = val.get("username", user)
-                    password = val.get("password", password)
-                    from_email = val.get("from_email", from_email)
-                    from_name = val.get("from_name", from_name)
-                    tls = val.get("tls", tls)
-            except Exception as e:
-                logger.warning(f"Failed to read SMTP config from DB: {e}")
+        #if db is not None:
+         #   try:
+          #      smtp_doc = db.system_settings.find_one({"key": "smtp_config"})
+           #     if smtp_doc and smtp_doc.get("value"):
+            #       host = val.get("host", host)
+             #       port = int(val.get("port", port))
+              #      user = val.get("username", user)
+               #     password = val.get("password", password)
+                #    from_email = val.get("from_email", from_email)
+                 #   from_name = val.get("from_name", from_name)
+                  #  tls = val.get("tls", tls)
+            #except Exception as e:
+             #   logger.warning(f"Failed to read SMTP config from DB: {e}")
 
         return {
             "host": host,

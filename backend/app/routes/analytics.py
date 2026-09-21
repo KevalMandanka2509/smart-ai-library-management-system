@@ -34,7 +34,11 @@ def _date_key(dt, granularity: str) -> str:
 # 1. FULL DASHBOARD KPI SUMMARY
 # ─────────────────────────────────────────────
 @router.get("/dashboard")
-async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_permission("reports:view"))):
+async def get_dashboard_analytics(
+    trend_range: str = Query("30D"),
+    db=Depends(get_db), 
+    current_user=Depends(has_permission("reports:view"))
+):
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     start_30 = now - timedelta(days=30)
     start_7 = now - timedelta(days=7)
@@ -121,9 +125,16 @@ async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_p
     ]
     top_students = list(db.borrows.aggregate(top_students_pipeline))
 
-    # ── Borrow trend (last 90 days) — aggregation pipelines ──
+    # ── Borrow trend (dynamic range) — aggregation pipelines ──
+    try:
+        trend_days = int(trend_range.replace('D', ''))
+    except ValueError:
+        trend_days = 30
+        
+    start_trend = now - timedelta(days=trend_days)
+    
     trend_issue_pipeline = [
-        {"$match": {"issue_date": {"$gte": start_90}}},
+        {"$match": {"issue_date": {"$gte": start_trend}}},
         {"$group": {
             "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$issue_date"}},
             "count": {"$sum": 1}
@@ -132,7 +143,7 @@ async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_p
     daily_issue = {doc["_id"]: doc["count"] for doc in db.borrows.aggregate(trend_issue_pipeline)}
 
     trend_return_pipeline = [
-        {"$match": {"return_date": {"$gte": start_90, "$ne": None}}},
+        {"$match": {"return_date": {"$gte": start_trend, "$ne": None}}},
         {"$group": {
             "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$return_date"}},
             "count": {"$sum": 1}
@@ -140,11 +151,11 @@ async def get_dashboard_analytics(db=Depends(get_db), current_user=Depends(has_p
     ]
     daily_return = {doc["_id"]: doc["count"] for doc in db.borrows.aggregate(trend_return_pipeline)}
 
-    # Build 90 day labels
+    # Build dynamic labels
     trend_labels = []
     trend_issues = []
     trend_returns = []
-    for i in range(89, -1, -1):
+    for i in range(trend_days - 1, -1, -1):
         day = (now - timedelta(days=i)).strftime("%Y-%m-%d")
         trend_labels.append(day)
         trend_issues.append(daily_issue.get(day, 0))

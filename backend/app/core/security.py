@@ -23,10 +23,15 @@ class Security:
 
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        """Verify plain password against hashed password"""
-        return bcrypt.checkpw(
-            plain_password.encode("utf-8"), hashed_password.encode("utf-8")
-        )
+        """Verify plain password against hashed password safely"""
+        if not hashed_password:
+            return False
+        try:
+            return bcrypt.checkpw(
+                plain_password.encode("utf-8"), hashed_password.encode("utf-8")
+            )
+        except (ValueError, TypeError):
+            return False
 
     @staticmethod
     def create_access_token(

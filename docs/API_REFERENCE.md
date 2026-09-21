@@ -48,7 +48,7 @@ The backend exposes a highly structured RESTful interface powered by FastAPI.
 - **PUT `/api/v1/notifications/{id}/read`**: Mark as read.
 
 ## Reports (`/api/v1/reports`)
-- **GET `/api/v1/reports/dashboard`**: Fetch aggregate KPI statistics (Admin/Librarian).
+- **GET `/api/v1/analytics/dashboard`**: Fetch aggregate KPI statistics (Admin/Librarian).
 - **GET `/api/v1/reports/overdue`**: List overdue active borrows.
 
 ## Settings (`/api/v1/settings`)

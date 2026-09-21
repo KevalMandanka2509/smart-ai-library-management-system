@@ -40,12 +40,13 @@ results = {}
 # 1. Books CRUD
 try:
     b = requests.post(f"{base_url}/api/v1/books", headers=headers, json={
-        "title": "Smoke Test Book", "author": "Tester", "isbn": "SMOKE123", "total_copies": 2, "available_copies": 2, "category": "Test"
+        "title": "Smoke Test Book", "author": "Tester", "isbn": "SMOKE12345", "total_copies": 2, "available_copies": 2, "category": "Test"
     })
     b_id = b.json().get("id") or b.json().get("_id")
     if not b_id and "_id" in b.json(): b_id = str(b.json()["_id"])
     requests.get(f"{base_url}/api/v1/books", headers=headers)
-    requests.delete(f"{base_url}/api/v1/books/{b_id}", headers=headers)
+    if b_id and str(b_id) != "None":
+        requests.delete(f"{base_url}/api/v1/books/{b_id}", headers=headers)
     results["Books CRUD"] = "PASS" if b.status_code in [200, 201] else f"FAIL {b.status_code}"
 except Exception as e:
     results["Books CRUD"] = f"FAIL {e}"
@@ -57,7 +58,7 @@ try:
     })
     s_id = s.json().get("id") or s.json().get("_id")
     requests.get(f"{base_url}/api/v1/students", headers=headers)
-    if s_id:
+    if s_id and str(s_id) != "None":
         requests.delete(f"{base_url}/api/v1/students/{s_id}", headers=headers)
     results["Students CRUD"] = "PASS" if s.status_code in [200, 201] else f"FAIL {s.status_code}"
 except Exception as e:
@@ -65,7 +66,7 @@ except Exception as e:
 
 # 7. Reports
 try:
-    r = requests.get(f"{base_url}/api/v1/reports/dashboard", headers=headers)
+    r = requests.get(f"{base_url}/api/v1/analytics/dashboard", headers=headers)
     results["Reports & Analytics"] = "PASS" if r.status_code == 200 else f"FAIL {r.status_code}"
 except Exception as e:
     results["Reports & Analytics"] = f"FAIL {e}"

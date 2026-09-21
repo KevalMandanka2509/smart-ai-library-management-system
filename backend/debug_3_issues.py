@@ -75,7 +75,7 @@ except Exception as e:
     print("Librarian Books Test Error:", e)
 
 # Cleanup
-if book_id:
+if book_id and str(book_id) != "None":
     requests.delete(f"{base_url}/api/v1/books/{book_id}", headers=admin_hdr)
 db.users.delete_many({"email": {"$in": [member_email, librarian_email]}})
 db.students.delete_many({"email": member_email})

@@ -1,8 +1,10 @@
+import pytest
 import asyncio
 import time
 from datetime import datetime, timedelta, timezone
 from app.database import db
 
+@pytest.mark.asyncio
 async def test_dashboard():
     database = db.get_db()
     now = datetime.now(timezone.utc).replace(tzinfo=None)

@@ -23,6 +23,18 @@ export default defineConfig({
             if (id.includes('axios')) {
               return 'vendor_axios';
             }
+            if (id.includes('recharts')) {
+              return 'vendor_recharts';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor_lucide';
+            }
+            if (id.includes('jspdf')) {
+              return 'vendor_jspdf';
+            }
+            if (id.includes('xlsx')) {
+              return 'vendor_xlsx';
+            }
             return 'vendor_libs';
           }
         }

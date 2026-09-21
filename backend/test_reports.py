@@ -6,7 +6,7 @@ BASE_URL = "http://localhost:8000/api/v1/enterprise_analytics"
 # Wait, let's login first to get a token.
 
 def get_token():
-    res = requests.post("http://localhost:8000/api/v1/auth/login", data={"username": "admin", "password": "password"}) # default credentials if applicable
+    res = requests.post("http://localhost:8000/api/v1/auth/login", json={"email": "admin@library.com", "password": "TestAdmin@123!"})
     if res.status_code == 200:
         return res.json().get("access_token")
     return None

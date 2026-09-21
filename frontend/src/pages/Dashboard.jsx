@@ -29,7 +29,7 @@ const Dashboard = () => {
     try {
       setLoading(true);
       setError('');
-      const result = await getDashboardAnalytics();
+      const result = await getDashboardAnalytics(trendRange);
       setData(result);
     } catch (e) {
       setError('Could not load dashboard analytics. Make sure backend is running.');
@@ -37,16 +37,16 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [trendRange]);
 
   const loadSilent = useCallback(async () => {
     try {
-      const result = await getDashboardAnalytics();
+      const result = await getDashboardAnalytics(trendRange);
       setData(result);
     } catch (e) {
       console.error('Silent auto-sync failed:', e);
     }
-  }, []);
+  }, [trendRange]);
 
   useEffect(() => {
     const stored = localStorage.getItem('user');
@@ -73,41 +73,13 @@ const Dashboard = () => {
 
   // Rebuild trend data dynamically according to selected trendRange (7D, 30D, 90D)
   const filteredTrend = useMemo(() => {
-    const limit = trendRange === '7D' ? 7 : trendRange === '90D' ? 90 : 30;
-
-    // Map existing backend data so we can resolve values by date key
-    const dataMap = {};
-    if (trend && trend.labels) {
-      trend.labels.forEach((lbl, idx) => {
-        dataMap[lbl] = {
-          issue: trend.issues[idx] || 0,
-          ret: trend.returns[idx] || 0
-        };
-      });
-    }
-
-    const labels = [];
-    const issues = [];
-    const returns = [];
-    const today = new Date();
-
-    for (let i = limit - 1; i >= 0; i--) {
-      const d = new Date(today.getTime() - i * 86400000);
-      const dateStr = d.toISOString().slice(0, 10); // YYYY-MM-DD
-      labels.push(dateStr);
-
-      const dayData = dataMap[dateStr];
-      if (dayData) {
-        issues.push(dayData.issue);
-        returns.push(dayData.ret);
-      } else {
-        issues.push(0);
-        returns.push(0);
-      }
-    }
-
-    return { labels, issues, returns };
-  }, [trendRange, trend]);
+    if (!trend) return { labels: [], issues: [], returns: [] };
+    return {
+      labels: trend.labels || [],
+      issues: trend.issues || [],
+      returns: trend.returns || []
+    };
+  }, [trend]);
 
   // Sparkline data: last 14 days issues & returns
   const last14Issues = useMemo(() => trend?.issues ? trend.issues.slice(-14) : [], [trend]);

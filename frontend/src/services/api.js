@@ -14,7 +14,13 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
     if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+      if (config.headers && typeof config.headers.set === 'function') {
+        config.headers.set('Authorization', `Bearer ${token}`);
+      } else if (config.headers) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        config.headers = { Authorization: `Bearer ${token}` };
+      }
     }
     return config;
   },
@@ -22,6 +28,20 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
 
 api.interceptors.response.use(
   (response) => response,
@@ -34,7 +54,24 @@ api.interceptors.response.use(
       !originalRequest.url.includes('/auth/login') &&
       !originalRequest.url.includes('/auth/refresh')
     ) {
+      if (isRefreshing) {
+        return new Promise(function(resolve, reject) {
+          failedQueue.push({ resolve, reject });
+        }).then(token => {
+          if (originalRequest.headers && typeof originalRequest.headers.set === 'function') {
+            originalRequest.headers.set('Authorization', `Bearer ${token}`);
+          } else {
+            originalRequest.headers['Authorization'] = `Bearer ${token}`;
+          }
+          return api(originalRequest);
+        }).catch(err => {
+          return Promise.reject(err);
+        });
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
+
       const refToken = localStorage.getItem('refresh_token');
       if (refToken) {
         try {
@@ -44,15 +81,25 @@ api.interceptors.response.use(
             if (res.data.refresh_token) {
               localStorage.setItem('refresh_token', res.data.refresh_token);
             }
-            originalRequest.headers['Authorization'] = `Bearer ${res.data.access_token}`;
+            if (originalRequest.headers && typeof originalRequest.headers.set === 'function') {
+              originalRequest.headers.set('Authorization', `Bearer ${res.data.access_token}`);
+            } else {
+              originalRequest.headers['Authorization'] = `Bearer ${res.data.access_token}`;
+            }
+            processQueue(null, res.data.access_token);
+            isRefreshing = false;
             return api(originalRequest);
           }
         } catch (refreshErr) {
+          processQueue(refreshErr, null);
+          isRefreshing = false;
           localStorage.clear();
           window.location.href = '/login?expired=true';
           return Promise.reject(refreshErr);
         }
       } else {
+        processQueue(error, null);
+        isRefreshing = false;
         localStorage.clear();
         window.location.href = '/login?expired=true';
         return Promise.reject(error);
@@ -377,9 +424,9 @@ export const deleteNotification = async (id) => {
 };
 
 // ===== Analytics API =====
-export const getDashboardAnalytics = async () => {
+export const getDashboardAnalytics = async (trendRange = '30D') => {
   const [dashRes, catRes] = await Promise.allSettled([
-    api.get('/analytics/dashboard'),
+    api.get(`/analytics/dashboard?trend_range=${trendRange}`),
     api.get('/enterprise_analytics/categories?period=all_time')
   ]);
   
@@ -765,7 +812,7 @@ export const sendChatMessage = async (message, history = [], sessionId = null, f
   if (file) formData.append('file', file);
 
   const response = await api.post('/ai/chat', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: { 'Content-Type': undefined },
     timeout: 60000
   });
   return response.data;

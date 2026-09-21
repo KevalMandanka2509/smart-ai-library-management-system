@@ -23,6 +23,14 @@ const RegisterPage = () => {
   const [serverError, setServerError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  const extractErrorMessage = (err, defaultMessage) => {
+    const detail = err?.response?.data?.detail;
+    if (Array.isArray(detail)) {
+      return detail[0]?.msg || defaultMessage;
+    }
+    return typeof detail === 'string' ? detail : defaultMessage;
+  };
+
   const handleChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
     setFieldErrors((prev) => ({ ...prev, [field]: '' }));
@@ -50,8 +58,11 @@ const RegisterPage = () => {
 
     if (!form.password) {
       errors.password = 'Password is required.';
-    } else if (form.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters.';
+    } else {
+      const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+      if (!strongPasswordRegex.test(form.password)) {
+        errors.password = 'Password must be at least 8 characters, include an uppercase, lowercase, number, and special character.';
+      }
     }
 
     if (!form.confirmPassword) {
@@ -93,7 +104,7 @@ const RegisterPage = () => {
       }, 1800);
     } catch (err) {
       setServerError(
-        err?.response?.data?.detail || 'Registration failed. Please try again.'
+        extractErrorMessage(err, 'Registration failed. Please try again.')
       );
     } finally {
       setIsLoading(false);

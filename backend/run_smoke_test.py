@@ -70,17 +70,17 @@ run_test("Auth", lambda: admin_token is not None and member_token is not None)
 
 if admin_token:
     # Admin RBAC
-    resp = requests.get(f"{base_url}/api/v1/reports/dashboard", headers={"Authorization": f"Bearer {admin_token}"})
+    resp = requests.get(f"{base_url}/api/v1/analytics/dashboard", headers={"Authorization": f"Bearer {admin_token}"})
     run_test("Admin RBAC", lambda: resp.status_code == 200)
 
     # Books CRUD
-    book_data = {"title": "Test Book", "author": "Test Author", "isbn": "999999999", "total_copies": 5, "available_copies": 5, "category": "Test"}
+    book_data = {"title": "Test Book", "author": "Test Author", "isbn": "9999999999", "total_copies": 5, "available_copies": 5, "category": "Test"}
     resp = requests.post(f"{base_url}/api/v1/books", headers={"Authorization": f"Bearer {admin_token}"}, json=book_data)
     if resp.status_code in [200, 201]:
         book_id = resp.json().get("_id") or resp.json().get("id")
         if not book_id and "_id" in resp.json():
-            book_id = str(resp.json()["_id"])
-        if book_id:
+            book_id = resp.json()["_id"]
+        if book_id and str(book_id) != "None":
             resp = requests.delete(f"{base_url}/api/v1/books/{book_id}", headers={"Authorization": f"Bearer {admin_token}"})
             run_test("Books CRUD", lambda: resp.status_code in [200, 204])
         else:
@@ -90,7 +90,7 @@ if admin_token:
 
 if member_token:
     # Member RBAC (Negative)
-    resp = requests.get(f"{base_url}/api/v1/reports/dashboard", headers={"Authorization": f"Bearer {member_token}"})
+    resp = requests.get(f"{base_url}/api/v1/analytics/dashboard", headers={"Authorization": f"Bearer {member_token}"})
     run_test("Member RBAC", lambda: resp.status_code in [401, 403])
 
 # Cleanup

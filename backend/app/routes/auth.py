@@ -329,7 +329,7 @@ async def verify_otp(request: VerifyOTPRequest, db=Depends(get_db)):
         
     # Generate reset token (single-use)
     reset_token = secrets.token_urlsafe(32)
-    reset_expiry = now + timedelta(minutes=15)
+    reset_expiry = now + timedelta(minutes=30)
     
     rate_limits.update_one(
         {"_id": limit_doc["_id"]},

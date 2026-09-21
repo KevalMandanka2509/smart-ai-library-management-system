@@ -28,6 +28,8 @@ class ErrorBoundary extends Component {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: '2rem', textAlign: 'center', background: '#fdfcf9' }}>
           <h2 style={{ color: '#dc2626' }}>Something went wrong.</h2>
+          <p style={{ color: '#b91c1c', fontWeight: 'bold' }}>{this.state.error?.toString()}</p>
+          <pre style={{ textAlign: 'left', maxWidth: '800px', overflowX: 'auto', background: '#f8f8f8', padding: '1rem' }}>{this.state.errorInfo?.componentStack}</pre>
           <p>Please refresh the page or contact the system administrator if the issue persists.</p>
           <button 
             onClick={() => window.location.reload()} 

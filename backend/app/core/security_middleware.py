@@ -50,18 +50,20 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             user_hits = self.auth_requests[client_ip]
             count = self._clean_and_count(user_hits, now)
             if count >= self.auth_limit:
-                raise HTTPException(
+                from fastapi.responses import JSONResponse
+                return JSONResponse(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Too many authentication attempts. Please try again in 1 minute."
+                    content={"detail": "Too many authentication attempts. Please try again in 1 minute."}
                 )
             user_hits.append(now)
         elif path.startswith("/api/v1/"):
             user_hits = self.general_requests[client_ip]
             count = self._clean_and_count(user_hits, now)
             if count >= self.general_limit:
-                raise HTTPException(
+                from fastapi.responses import JSONResponse
+                return JSONResponse(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Too many requests. Please try again shortly."
+                    content={"detail": "Too many requests. Please try again shortly."}
                 )
             user_hits.append(now)
 

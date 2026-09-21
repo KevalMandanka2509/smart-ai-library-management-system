@@ -43,7 +43,7 @@ class UserCreateAdmin(BaseModel):
 
 class UpdateRolePermissions(BaseModel):
     role: str
-    permissions: List[str]
+    permissions: Optional[List[str]] = []
 
     @field_validator("role")
     @classmethod
